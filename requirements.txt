@@ -1,0 +1,4 @@
+plyfile==0.8.1
+tqdm
+submodules/diff-gaussian-rasterization
+submodules/simple-knn

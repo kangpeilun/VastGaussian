@@ -1,0 +1,13 @@
+*.pyc
+.vscode
+.idea
+datasets
+output
+SIBR
+SIBR_viewers
+build
+paper_result
+diff_rasterization/diff_rast.egg-info
+diff_rasterization/dist
+tensorboard_3d
+screenshots
