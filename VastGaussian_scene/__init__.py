@@ -1,13 +1,10 @@
-#
-# Copyright (C) 2023, Inria
-# GRAPHDECO research group, https://team.inria.fr/graphdeco
-# All rights reserved.
-#
-# This software is free for non-commercial, research and evaluation use 
-# under the terms of the LICENSE.md file.
-#
-# For inquiries contact  george.drettakis@inria.fr
-#
+# Author: Peilun Kang
+# Contact: kangpeilun@nefu.edu.cn
+# License: Apache Licence
+# Project: VastGaussian
+# File: __init__.py.py
+# Time: 5/15/24 2:26 PM
+# Des:
 
 import os
 import random
@@ -17,6 +14,7 @@ from scene.dataset_readers import sceneLoadTypeCallbacks
 from scene.gaussian_model import GaussianModel
 from arguments import ModelParams
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
+from VastGaussian_scene.data_partition import ProgressiveDataPartitioning
 
 
 class Scene:
@@ -49,6 +47,10 @@ class Scene:
         else:
             assert False, "Could not recognize scene type!"
 
+        # TODO：实现数据预处理
+        DataPartitioning = ProgressiveDataPartitioning(scene_info, self.model_path)
+        DataPartitioning.Camera_position_based_region_division()
+        DataPartitioning.Position_based_data_selection()
 
         if not self.loaded_iter:
             with open(scene_info.ply_path, 'rb') as src_file, open(os.path.join(self.model_path, "input.ply"),

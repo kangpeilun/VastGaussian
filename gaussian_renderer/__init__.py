@@ -43,11 +43,11 @@ def render(viewpoint_camera, pc: GaussianModel, pipe, bg_color: torch.Tensor, sc
         pass
 
     # Set up rasterization configuration 设置光栅化配置
-    tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
-    tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
+    tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)  # 水平x轴一半fov角度的 tan值
+    tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)  # 垂直y轴一半fov角度的 tan值
     # 保存高斯渲染参数
     raster_settings = GaussianRasterizationSettings(
-        image_height=int(viewpoint_camera.image_height),  # 545
+        image_height=int(viewpoint_camera.image_height),  # 545 经过将采样的值也用image_height保存
         image_width=int(viewpoint_camera.image_width),  # 980
         tanfovx=tanfovx,  # 0.8446965112441062
         tanfovy=tanfovy,  # 0.4679476755039769
@@ -56,7 +56,7 @@ def render(viewpoint_camera, pc: GaussianModel, pipe, bg_color: torch.Tensor, sc
         viewmatrix=viewpoint_camera.world_view_transform,  # [4, 4]
         projmatrix=viewpoint_camera.full_proj_transform,  # [4, 4]
         sh_degree=pc.active_sh_degree,  # 0
-        campos=viewpoint_camera.camera_center,  # [3,] tensor([3.1687, 0.1043, 0.9233], device='cuda:0')
+        campos=viewpoint_camera.camera_center,  # 相机中心的世界坐标 [3,] tensor([3.1687, 0.1043, 0.9233], device='cuda:0')
         prefiltered=False,  # False
         debug=pipe.debug  # False
     )
@@ -125,15 +125,6 @@ def render(viewpoint_camera, pc: GaussianModel, pipe, bg_color: torch.Tensor, sc
         rotations=rotations,
         cov3D_precomp=cov3D_precomp)
 
-    # rendered_image, radii, depth = rasterizer(  # 经过修改的diff-gaussian，只进行forwards才输出深度，depth不能进行backwards，因此depth只有在进行render是才能启用
-    #     means3D=means3D,
-    #     means2D=means2D,
-    #     shs=shs,
-    #     colors_precomp=colors_precomp,
-    #     opacities=opacity,
-    #     scales=scales,
-    #     rotations=rotations,
-    #     cov3D_precomp=cov3D_precomp)
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.
@@ -142,10 +133,3 @@ def render(viewpoint_camera, pc: GaussianModel, pipe, bg_color: torch.Tensor, sc
             "viewspace_points": screenspace_points,
             "visibility_filter": radii > 0,  # 能见度过滤器
             "radii": radii}  # 半径
-
-    # 渲染深度
-    # return {"render": rendered_image,
-    #         "viewspace_points": screenspace_points,
-    #         "visibility_filter": radii > 0,  # 能见度过滤器
-    #         "radii": radii,
-    #         "depth": depth}  # 半径

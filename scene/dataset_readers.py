@@ -63,7 +63,7 @@ def getNerfppNorm(cam_info):
         avg_cam_center = np.mean(cam_centers, axis=1, keepdims=True)  # 得到平均摄像机中心点x y z三个方向各有一个均值
         center = avg_cam_center
         dist = np.linalg.norm(cam_centers - center, axis=0, keepdims=True)  # np.linalg.norm表示求范数
-        diagonal = np.max(dist)
+        diagonal = np.max(dist)  # 计算相机中心坐标到平均相机中心坐标的距离的最大值
         return center.flatten(), diagonal
 
     cam_centers = []
@@ -71,12 +71,12 @@ def getNerfppNorm(cam_info):
     for cam in cam_info:
         W2C = getWorld2View2(cam.R, cam.T)  # 根据相机的旋转矩阵和平移向量，将 世界坐标系 -> 相机坐标系
         C2W = np.linalg.inv(W2C)  # 相机坐标系 -> 世界坐标系
-        cam_centers.append(C2W[:3, 3:4])  # 将变换矩阵中的平移向量作为相机的中心，在世界坐标系下相机的中心
+        cam_centers.append(C2W[:3, 3:4])  # 将变换矩阵中的平移向量作为相机的中心，在世界坐标系下相机的中心坐标
 
     center, diagonal = get_center_and_diag(cam_centers)
     radius = diagonal * 1.1  # 半径
 
-    translate = -center  # 将相机
+    translate = -center  # 用于将相机中心点移动到原点
 
     return {"translate": translate, "radius": radius}
 
@@ -161,6 +161,7 @@ def storePly(path, xyz, rgb):
 
 
 def readColmapSceneInfo(path, images, eval, llffhold=8):
+    # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")   # 相机外参文件
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")  # 相机内参文件
@@ -290,15 +291,11 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
     return scene_info
 
 
-# TODO: 完成RPC模型数据的加载
-def readRpcSceneInfo():
-    pass
 
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
     "Blender": readNerfSyntheticInfo,
-    "Rpc": readRpcSceneInfo,
 }
 
 

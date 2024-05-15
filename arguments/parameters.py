@@ -25,7 +25,7 @@ def ModelParams(parser):
     parser.add_argument("--eval", type=bool, default=False)  # 添加此标志以使用mipnerf360风格的培训/测试分割进行评估。
     # 指定训练前加载图像的分辨率。如果提供1、2、4或8，分别使用原始、1/2、1/4或1/8分辨率。对于所有其他值，将宽度重新缩放到给定的数字，同时保持图像的长宽。
     # 如果未设置且输入图像宽度超过1.6K像素，则输入将自动重新缩放到此目标。
-    parser.add_argument("--resolution", "-r", type=int, default=-1)
+    parser.add_argument("--resolution", "-r", type=int, default=4)
     parser.add_argument("--data_device", type=str,
                         default="cuda")  # 指定源图像数据的位置，默认为cuda，如果在大型/高分辨率数据集上训练，建议使用cpu，将减少VRAM消耗，但会稍微减慢训练速度。
     parser.add_argument("--white_background", "-w", type=bool, default=False)  # 添加此标志以使用白色背景而不是黑色(默认)，例如，用于评估NeRF合成数据集。
@@ -54,9 +54,9 @@ def OptimizationParams(parser):
     parser.add_argument("--densify_until_iter", type=int, default=15_000)  # 迭代时停止致密化，默认为15_000。
     parser.add_argument("--densify_grad_threshold", type=float, default=0.0002)  # 决定点是否应该基于2D位置梯度进行密度化的限制，默认值为0.0002。
     parser.add_argument("--densification_interval", type=float, default=100)  # 密集化的频率，默认为100(每100次迭代)。
-    parser.add_argument("--opacity_reset_interval", type=int, default=3000)  # 重置不透明度的频率，默认为3_000。
+    parser.add_argument("--opacity_reset_interval", type=int, default=3000)  # 重置不透明度的频率，默认为3_000。优化可能会遇到靠近输入摄像头的漂浮物,也就是致密化产生不必要的高斯点，因此将将不透明度设置为0
     parser.add_argument("--lambda_dssim", type=float, default=0.2)  # SSIM对总损失的影响从0到1,0.2默认。
-    parser.add_argument("--percent_dense", type=float, default=0.01)  # 一个点必须超过场景范围的百分比(0- 1)才能强制致密化，默认为0.01。
+    parser.add_argument("--percent_dense", type=float, default=0.01)  # 一个点必须超过场景范围的百分比(0-1)才能强制致密化，默认为0.01。通过百分比来限制多大的高斯应该被split，多小的高斯应该被clone
 
     return parser
 

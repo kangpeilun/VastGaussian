@@ -41,16 +41,16 @@ def getWorld2View(R, t):
 
 def getWorld2View2(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
     # 将世界坐标系（World Coordinate System，WCS）中的点投影到相机坐标系（View Coordinate System，VCS）中
-    Rt = np.zeros((4, 4))
+    Rt = np.zeros((4, 4))  # W2C
     Rt[:3, :3] = R.transpose()
     Rt[:3, 3] = t
     Rt[3, 3] = 1.0
 
     C2W = np.linalg.inv(Rt)
-    cam_center = C2W[:3, 3]
+    cam_center = C2W[:3, 3]  # 相机在世界坐标系中的坐标位置
     cam_center = (cam_center + translate) * scale
     C2W[:3, 3] = cam_center
-    Rt = np.linalg.inv(C2W)
+    Rt = np.linalg.inv(C2W)  # W2C
     return np.float32(Rt)  # 得到的是变换矩阵
 
 

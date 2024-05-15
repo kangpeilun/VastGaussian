@@ -17,7 +17,7 @@ from utils.graphics_utils import getWorld2View2, getProjectionMatrix
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
                  image_name, uid,
-                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda", params=None
+                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device="cuda", params=None
                  ):
         super(Camera, self).__init__()
 
@@ -61,17 +61,16 @@ class Camera(nn.Module):
         else:
             self.original_image *= torch.ones((1, self.image_height, self.image_width), device=self.data_device)  # 2G显存 执行这行代码时会报显存不足
 
-        self.zfar = 100.00
-        self.znear = 0.01
+        # 距离相机平面znear和zfar之间且在视锥内的物体才会被渲染
+        self.zfar = 100.00  # 最远能看到多远
+        self.znear = 0.01   # 最近能看到多近
 
-        self.trans = trans
-        self.scale = scale
-        # TODO: debug 投影矩阵 和 变换矩阵，对投影矩阵和变换矩阵进行调整
-        self.world_view_transform = torch.tensor(getWorld2View2(R, T, trans, scale)).transpose(0, 1).cuda()  # 将世界坐标系中的点投影到视图坐标系中
+        self.trans = trans  # 相机中心的平移
+        self.scale = scale  # 相机中心坐标的缩放
+        self.world_view_transform = torch.tensor(getWorld2View2(R, T, trans, scale)).transpose(0, 1).cuda()  # W2C世界到相机坐标系的变换矩阵，4×4  注意这里使用transpose(0, 1)进行了一下转置
         self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0, 1).cuda()  # 投影矩阵+正交投影->NDC空间，用于将坐标压缩到0-1之间
-        # self.projection_matrix_2 =
         self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)  # 世界->相机->NDC空间
-        self.camera_center = self.world_view_transform.inverse()[3, :3]
+        self.camera_center = self.world_view_transform.inverse()[3, :3]  # 相机中心在世界坐标系下的坐标 world_view_transform进行了一下转置，所以取[3, :3]
 
 class MiniCam:
     def __init__(self, width, height, fovy, fovx, znear, zfar, world_view_transform, full_proj_transform):

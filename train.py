@@ -15,7 +15,8 @@ from random import randint
 from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
 import sys
-from scene import Scene, GaussianModel
+# from scene import Scene, GaussianModel
+from VastGaussian_scene import Scene, GaussianModel
 from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
@@ -92,8 +93,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # depth参数不参与梯度的更新和模型训练，只有在只进行render时渲染出depth图
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg[
             "viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
-        # image, viewspace_point_tensor, visibility_filter, radii, depth = render_pkg["render"], render_pkg["viewspace_points"], \
-        #     render_pkg["visibility_filter"], render_pkg["radii"], render_pkg['depth']
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()  # 获取ground truth图像
         Ll1 = l1_loss(image, gt_image)

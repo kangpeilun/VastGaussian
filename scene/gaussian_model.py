@@ -24,23 +24,24 @@ from utils.general_utils import strip_symmetric, build_scaling_rotation
 
 class GaussianModel:
 
-    def setup_functions(self):
+    def setup_functions(self): #用于设置一些激活函数和变换函数
         def build_covariance_from_scaling_rotation(scaling, scaling_modifier, rotation):
+            # 构建协方差矩阵，该函数接受 scaling（尺度）、scaling_modifier（尺度修正因子）、rotation（旋转）作为参数
             # 用于根据缩放和旋转构建协方差矩阵。
             L = build_scaling_rotation(scaling_modifier * scaling, rotation)
             actual_covariance = L @ L.transpose(1, 2)
             symm = strip_symmetric(actual_covariance)
-            return symm
+            return symm #最终返回对称的协方差矩阵。
 
-        self.scaling_activation = torch.exp
-        self.scaling_inverse_activation = torch.log
+        self.scaling_activation = torch.exp  #将尺度激活函数设置为指数函数。
+        self.scaling_inverse_activation = torch.log  #将尺度逆激活函数设置为对数函数。
 
-        self.covariance_activation = build_covariance_from_scaling_rotation
+        self.covariance_activation = build_covariance_from_scaling_rotation  #将协方差激活函数设置为上述定义的 build_covariance_from_scaling_rotation 函数。
 
-        self.opacity_activation = torch.sigmoid
-        self.inverse_opacity_activation = inverse_sigmoid
+        self.opacity_activation = torch.sigmoid  #将不透明度激活函数设置为 sigmoid 函数。
+        self.inverse_opacity_activation = inverse_sigmoid  #将不透明度逆激活函数设置为一个名为 inverse_sigmoid 的函数
 
-        self.rotation_activation = torch.nn.functional.normalize
+        self.rotation_activation = torch.nn.functional.normalize  #用于归一化旋转矩阵。
 
     def __init__(self, dataset):
         """
@@ -152,12 +153,12 @@ class GaussianModel:
             并分别赋值给 `self._xyz`、`self._features_dc`、`self._features_rest`、`self._scaling`、`self._rotation` 和 `self._opacity`。
         最后，创建一个大小为 `(self.get_xyz.shape[0])` 的零张量 `max_radii2D`，并将其转移到 cuda 设备上。
         """
-        self.spatial_lr_scale = spatial_lr_scale
+        self.spatial_lr_scale = spatial_lr_scale  # 定义空间xyz点云坐标位置的初始学习率
         fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()  # [Point_num, 3] 点云3D坐标
         fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())  # [Point_num, 3] 将点云数据 `pcd` 的颜色值转换为球谐系数表示的颜色值
         features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()  # [Point_num, 3, 16] 特征有16个分量，第一个分量存储初始sh系数
         features[:, :3, 0] = fused_color  # 第三个维度的第一个size全为fused_color，其他维度全赋值为0
-        features[:, 3:, 1:] = 0.0
+        features[:, 3:, 1:] = 0.0  # 可以理解为每个点云有3个颜色通道，每个颜色通道对应16个特征进行描述
 
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])  # 初始化的点云数量
         # TODO: debug simple_knn 这个库，distCUDA2输入参数的size=[Point_num, 3], 即每个3D点的坐标
@@ -167,18 +168,6 @@ class GaussianModel:
         rots[:, 0] = 1
 
         opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))  # [Point_num, 1]
-
-        # TODO：记录初始点云所处的坐标范围，在后面进行致密化时限定clone和split的点云要在一定范围内，不能随意增加，从而减小不必要的点云，需要进一步调试
-        if self.dataset.limited_range > 0:
-            print("Limiting range to ", self.dataset.limted_range)
-            min_x, max_x = torch.min(fused_point_cloud[:, 0]), torch.max(fused_point_cloud[:, 0])  # 获取初始点云的范围
-            min_y, max_y = torch.min(fused_point_cloud[:, 1]), torch.max(fused_point_cloud[:, 1])
-            min_z, max_z = torch.min(fused_point_cloud[:, 2]), torch.max(fused_point_cloud[:, 2])
-            # 考虑到点云不一定非要局限在初始范围内，可以适当的扩展初始的范围
-            scale = self.dataset.limited_range  # 范围扩展的倍数
-            self.limited_range = [min_x * scale, max_x * scale,
-                                  min_y * scale, max_y * scale,
-                                  min_z * scale, max_z * scale]
 
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))  # 记住点云坐标需要计算梯度
         self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))  # [Point_num, 1, 3] 记录特征的第一个分量点球谐系数，需要计算梯度
@@ -434,9 +423,6 @@ class GaussianModel:
                                               torch.max(self.get_scaling,
                                                         dim=1).values > self.percent_dense * scene_extent)  # [23509,] 比场景范围大到一定程度的点采用split，选取出大于阈值的点云
 
-        if self.dataset.limited_range > 0:  # 只有在限制点云的split区域后才进行区域筛选
-            selected_pts_mask_limited_range = self.densify_and_limited_range(self.get_xyz)  # 对需要split的点进行筛选，确保其范围在场景范围内
-            selected_pts_mask = torch.logical_and(selected_pts_mask, selected_pts_mask_limited_range)
 
         stds = self.get_scaling[selected_pts_mask].repeat(N, 1)  # [24, 3]选出这个几个高斯点云对应的标准差，同时复制N份，也就是2份
         means = torch.zeros((stds.size(0), 3), device="cuda")  # [24, 3] 生成均值，均值为0
@@ -459,9 +445,8 @@ class GaussianModel:
         # Extract points that satisfy the gradient condition 提取满足梯度条件的点
         selected_pts_mask = torch.where(torch.norm(grads, dim=-1) >= grad_threshold, True, False)
         selected_pts_mask = torch.logical_and(selected_pts_mask,
-                                              torch.max(self.get_scaling,
-                                                        dim=1).values <= self.percent_dense * scene_extent)  # 比场景范围小到一定程度的点采用clone
-
+                                              torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent)  # 高斯点云的尺寸比场景范围小到一定程度的点采用clone
+        # torch.max(self.get_scaling, dim=1).values 寻找每个点云在 x y z方向上的长度的最大值作为筛选的标准
         if self.dataset.limited_range > 0:  # 只有在限制点云的clone区域后才进行区域筛选
             selected_pts_mask_limited_range = self.densify_and_limited_range(self._xyz)  # 对需要克隆的点进行筛选，确保其范围在场景范围内
             selected_pts_mask = torch.logical_and(selected_pts_mask, selected_pts_mask_limited_range)  # 将前后两次的筛选结果进行与操作
@@ -475,32 +460,6 @@ class GaussianModel:
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
                                    new_rotation)
-
-    def densify_and_limited_range(self, xyz):
-        selected_pts_mask_min_x = torch.where(xyz[:, 0] >= self.limited_range[0], True, False)
-        selected_pts_mask_max_x = torch.where(xyz[:, 0] <= self.limited_range[1], True, False)
-        selected_pts_mask_x = torch.logical_and(selected_pts_mask_min_x, selected_pts_mask_max_x)
-
-        selected_pts_mask_min_y = torch.where(xyz[:, 1] >= self.limited_range[2], True, False)
-        selected_pts_mask_max_y = torch.where(xyz[:, 1] <= self.limited_range[3], True, False)
-        selected_pts_mask_y = torch.logical_and(selected_pts_mask_min_x, selected_pts_mask_max_x)
-
-        selected_pts_mask_min_z = torch.where(xyz[:, 2] >= self.limited_range[4], True, False)
-        selected_pts_mask_max_z = torch.where(xyz[:, 2] <= self.limited_range[5], True, False)
-        selected_pts_mask_z = torch.logical_and(selected_pts_mask_min_x, selected_pts_mask_max_x)
-
-        selected_pts_mask = torch.logical_and(torch.logical_and(selected_pts_mask_x, selected_pts_mask_y), selected_pts_mask_z)
-
-        return selected_pts_mask
-        # self._xyz = self._xyz[selected_pts_mask]  # 将筛选出来的点云的坐标复制到新变量
-        # self._features_dc = self._features_dc[selected_pts_mask]
-        # self._features_rest = self._features_rest[selected_pts_mask]
-        # self._opacity = self._opacity[selected_pts_mask]
-        # self._scaling = self._scaling[selected_pts_mask]
-        # self._rotation = self._rotation[selected_pts_mask]
-        #
-        # self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-        #                            new_rotation)
 
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
