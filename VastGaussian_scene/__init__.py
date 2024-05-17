@@ -47,10 +47,6 @@ class Scene:
         else:
             assert False, "Could not recognize scene type!"
 
-        # TODO：实现数据预处理
-        DataPartitioning = ProgressiveDataPartitioning(scene_info, self.model_path)
-        DataPartitioning.Camera_position_based_region_division()
-        DataPartitioning.Position_based_data_selection()
 
         if not self.loaded_iter:
             with open(scene_info.ply_path, 'rb') as src_file, open(os.path.join(self.model_path, "input.ply"),
@@ -80,6 +76,14 @@ class Scene:
             print("Loading Test Cameras")
             self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale,
                                                                            args)
+
+        # TODO：实现数据预处理
+        DataPartitioning = ProgressiveDataPartitioning(scene_info, self.train_cameras[resolution_scales[0]], self.model_path)
+        format_data = DataPartitioning.format_data()
+        # self.train_cameras[resolution_scale] = format_data['1_1']['cameras']  # 通过这样的方式将数据取出来
+        # self.gaussians.create_from_pcd(format_data['1_1']['point_cloud'], self.cameras_extent)
+
+        # TODO: 编写代码实现m*n个partition并行训练
 
         if self.loaded_iter:
             self.gaussians.load_ply(os.path.join(self.model_path,

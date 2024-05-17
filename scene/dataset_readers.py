@@ -81,6 +81,33 @@ def getNerfppNorm(cam_info):
     return {"translate": translate, "radius": radius}
 
 
+def getNerfppNorm_partition(cameras):
+    """
+    为partition后的相机重新生成对应的相机尺寸
+    :param cameras:
+    :return:
+    """
+    def get_center_and_diag(cam_centers):
+        cam_centers = np.vstack(cam_centers)
+        avg_cam_center = np.mean(cam_centers, axis=1, keepdims=True)  # 得到平均摄像机中心点x y z三个方向各有一个均值
+        center = avg_cam_center
+        dist = np.linalg.norm(cam_centers - center, axis=0, keepdims=True)  # np.linalg.norm表示求范数
+        diagonal = np.max(dist)  # 计算相机中心坐标到平均相机中心坐标的距离的最大值
+        return center.flatten(), diagonal
+
+    cam_centers = []
+
+    for cam in cameras:
+        cam_centers.append(np.array(cam.camera.camera_center.cpu()))  # 将变换矩阵中的平移向量作为相机的中心，在世界坐标系下相机的中心坐标
+
+    center, diagonal = get_center_and_diag(cam_centers)
+    radius = diagonal * 1.1  # 半径
+
+    translate = -center  # 用于将相机中心点移动到原点
+
+    return {"translate": translate, "radius": radius}
+
+
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     cam_infos = []
     for idx, key in enumerate(cam_extrinsics):  # 每个相机单独处理
