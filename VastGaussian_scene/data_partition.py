@@ -12,6 +12,7 @@ import copy
 import os
 import numpy as np
 from typing import NamedTuple
+import pickle
 
 from scene.dataset_readers import CameraInfo, storePly, getNerfppNorm_partition
 from utils.graphics_utils import BasicPointCloud
@@ -24,7 +25,7 @@ class CameraPose(NamedTuple):
 
 
 class CameraPartition(NamedTuple):
-    partition_id: str  # 部分的编号
+    partition_id: str  # 部分的字符编号
     cameras: list  # 该部分对应的所有相机 CameraPose
     point_cloud: BasicPointCloud  # 该部分对应的点云
     ori_camera_bbox: list  # 边界拓展前相机围成的相机 边界坐标 [x_min, x_max, z_min, z_max]，同时方便根据原始的边框对最后训练出来的点云进行裁减，获取原始的点云范围
@@ -39,12 +40,14 @@ class ProgressiveDataPartitioning:
     # 渐进数据分区
     def __init__(self, scene_info, train_cameras, model_path, m_region=2, n_region=4, extend_rate=0.2,
                  visible_rate=0.25):
+        self.partition_scene = None
         self.pcd = scene_info.point_cloud
         self.model_path = model_path  # 存放模型位置
         self.partition_dir = os.path.join(model_path, "partition_point_cloud")
         self.partition_ori_dir = os.path.join(self.partition_dir, "ori")
         self.partition_extend_dir = os.path.join(self.partition_dir, "extend")
         self.partition_visible_dir = os.path.join(self.partition_dir, "visible")
+        self.save_partition_data_dir = os.path.join(self.model_path, "partition_data.pkl")
         self.m_region = m_region
         self.n_region = n_region
         self.extend_rate = extend_rate
@@ -58,9 +61,25 @@ class ProgressiveDataPartitioning:
         self.run_DataPartition(train_cameras)
 
     def run_DataPartition(self, train_cameras):
-        partition_dict = self.Camera_position_based_region_division(train_cameras)
-        partition_list = self.Position_based_data_selection(partition_dict)
-        self.partition_scene = self.Visibility_based_camera_selection(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云
+        if not os.path.exists(self.save_partition_data_dir):
+            partition_dict = self.Camera_position_based_region_division(train_cameras)
+            partition_list = self.Position_based_data_selection(partition_dict)
+            self.partition_scene = self.Visibility_based_camera_selection(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云
+            self.save_partition_data()
+        else:
+            self.partition_scene = self.load_partition_data()
+
+
+    def save_partition_data(self):
+        """将partition后的数据序列化保存起来，方便下次加载"""
+        with open(self.save_partition_data_dir, 'wb') as f:
+            pickle.dump(self.partition_scene, f)
+
+    def load_partition_data(self):
+        """加载partition后的数据"""
+        with open(self.save_partition_data_dir, 'rb') as f:
+            partition_scene = pickle.load(f)
+        return partition_scene
 
     def Camera_position_based_region_division(self, train_cameras):
         """1.基于相机位置的区域划分
@@ -330,13 +349,12 @@ class ProgressiveDataPartitioning:
              2.输出每个partition的点云
              3.计算每个partition中相机的尺寸, 目前先使用通过整个场景计算出来的尺寸
         """
-        format_data = {}
+        format_data = []
         for partition in self.partition_scene:
             partition_id = partition.partition_id
             point_cloud = partition.point_cloud
             cameras = [CameraPose.camera for CameraPose in partition.cameras]
             # cameras_extent = getNerfppNorm_partition(cameras)["radius"]
-            format_data[partition_id] = {"cameras": cameras,
-                                         "point_cloud": point_cloud}
+            format_data.append([cameras, point_cloud])
 
         return format_data
