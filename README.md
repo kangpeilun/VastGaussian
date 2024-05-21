@@ -1,53 +1,67 @@
 # VastGaussian
 
-这是VastGaussian的非官方实现
+![img.png](image/img_.png)
 
-## 数据预处理
+这是`VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction`的非官方实现，因为是第一次从头复现完整的代码，因此代码可能会出现一些错误，并且代码的写法和一些高手相比可能会显得有些幼稚，缺少一些工程上的技巧。
+不过我也迈出了自己的第一步，因为我在网络上找不到任何关于VastGaussian的任何实现，于是我进行了一下尝试。
 
-为了公平的比较，我们按照之前的方法[44,61]对图像进行了**4倍下采样**以进行训练和验证
+如果大家在使用过程中有任何代码修改方面的经验和反馈，反应联系我，或者简单的提出你的Issue：
+> Email: 374774222@qq.com
+> 
+> QQ: 374774222
+> 
+> WeChat: k374774222
 
-我们在主要实验中用8个细胞来评估我们的模型。可见性阈值为25%。在与长度为64的外观嵌入连接之前，渲染图像被下采样32次。每个单元被优化为60,000次迭代。细化[21]从第1000次迭代开始，到第30000次迭代结束，迭代间隔为200次。其他设置与3DGS相同[21]。外观嵌入和CNN都使用了0.001的学习率。我们执行**曼哈顿世界对齐，使世界坐标的y轴垂直于地平面**。
+## ToDo List
+1. [x] 实现Camera-position-based region division
+2. [x] 实现Position-based data selection
+3. [x] 实现Visibility-based camera selection
+4. [x] 实现Coverage-based point selection
+5. [x] 实现Decoupled Appearance Modeling
+6. [x] 实现Seamless Merging
+6. [ ] 实现将点云进行division后，m*n个region在单GPU上的并行训练
+7. [ ] 在UrbanScene3D和Mill-19数据集上进行实验
 
-## Progressive Data Partitioning 渐进数据分区
+## 说明
 
-我们将一个大型场景划分为多个单元，并将点云P和视图V的部分分配给这些单元进行优化。每个单元中包含的3D高斯数更少，更适合在内存容量较低的情况下进行优化，并且并行优化时所需的训练时间更少。在不失一般性的前提下，假设m × n单元格的网格很好地拟合场景，首先沿一个轴将地平面划分为m个部分，每个部分包含大约|V|/m个视图。然后沿着另一轴将这些部分进一步细分为n段，每个段大约包含|V|/(m × n)视图。虽然这里以基于网格的划分为例，但我们的数据划分策略也适用于其他基于地理位置的划分方法，如扇区划分和四叉树
+1. 我在原始的3DGS上进行了修改，首先我将3DGS的超参数从`arguments/__init__.py`中摘取了出来放在了`arguments/parameters.py`文件里，更加方便阅读和理解超参的含义
 
-![image-20240514141003653](http://typora-kpl.oss-cn-hangzhou.aliyuncs.com/202405141410883.png)
+2. 为了不改变3DGS原本的目录结构，我新添加了一个`VastGaussian_scene`用于存放VastGaussian的模块，其中一部分代码我调用了`scene`文件夹中已有的函数，同时为了解决`import`的错误，我将Scene类移动到了datasets.py文件夹里
+![img.png](image/img2.png)
+![img_1.png](image/img_1.png)
+3. 文件的命名与论文中提到的方法保持一致，方便阅读
 
-### Camera-position-based region division 基于相机位置的区域划分
+> `datasets.py` 我对3DGS中的Scene类进行了重写，分成BigScene和PartitionScene，前者表示原始的场景BigScene，后者表示经过Partition后的各个小场景PartitionScene
+>
+> `data_partition.py` 数据分区，对应论文 `Progressive Data Partitioning`
+> ![img_3.png](image/img_3.png)
+> 
+> `decouple_appearance_model.py` 外观解耦模块，对应论文 `Decoupled Appearance Modeling`
+> ![img.png](image/img.png)!
+> ![img_2.png](image/img_2.png)
+> `graham_scan.py` 凸包计算，用于在实现Visibility-based camera selection时，将partition后的立方体投影到相机平面上，并计算投影区域与图片区域的交集
+> 
+> `seamless_merging.py` 无缝合并，对应论文 `Seamless Merging`，将各个PartitionScene合并成BigScene
 
-我们根据摄像机在地平面上的投影位置对场景进行划分，并使每个单元包含相似数量的训练视图，以确保相同迭代次数下不同单元之间的均衡优化
+4. 我新增了一个`train_vast.py`文件，对训练VastGaussian的过程进行了修改，如果想对原始的3DGS进行训练，请使用`train.py`
 
-在不失一般性的前提下，假设m × n单元格的网格很好地拟合场景，首先沿一个轴将地平面划分为m个部分，每个部分包含大约|V|/m个视图。然后沿着另一轴将这些部分进一步细分为n段，每个段大约包含|V|/(m × n)视图。虽然这里以基于网格的划分为例，但我们的数据划分策略也适用于其他基于地理位置的划分方法，如扇区划分和四叉树。
+5. 论文中提到进行`曼哈顿世界对齐，使世界坐标的y轴垂直于地平面`，我在询问高人才知道，这个东西可以使用CloudCompare软件进行手动调整，其大体过程就是将点云所在的区域的包围盒边界调整到与点云区域的整体朝向保持平行
+> 比如下图中的点云原本是倾斜的，经过调整好变成水平和垂直的，高人说是曼哈顿世界对其是大尺度三维重建的基本操作(方便进行partition)，哈哈
+> ![img_4.png](image/img_4.png)![img_5.png](image/img_5.png)
+6. 我在实现过程中使用的是3DGS提供的小范围数据进行的测试，较大的数据本机跑不了
 
-### Position-based data selection 基于位置的数据选择
+7. 在实现过程中，在论文中的一些操作，作者并没有很明确的说明细节，因此一些实现是根据我的猜测和理解去完成的，也因此我的实现可能会有一些bug，并且有些实现在高手看来可能有些蠢，如果大家在使用过程中发现有问题，请及时联系我，一起进步
 
-在扩展其边界后我们将训练视图V和点云P的一部分分配给每个单元。具体地，设第j个区域为一个ℓh j ×ℓw j矩形;将原始边界以一定的百分比(20%)进行扩展，得到一个更大的矩形(ℓh j +0.2ℓh j)×(ℓw j +0.2ℓw j)。我们基于扩展的边界将训练视图V划分为{Vj} m×n j=1，并以同样的方式将点云P分割为{Pj}
+## 使用
 
-### Visibility-based camera selection 基于可见性的相机选择
+1. 数据格式和3DGS一样，同时训练的命令也和3DGS基本一样，我没有进行什么太多个性化的修改，你可以参考下面的命令(更多的参数请参考`arguments/parameters.py`):
+```python
+python train_vast.py -s output/dataset --exp_name test
+```
 
-我们发现在前一步中选择的相机不足以实现高保真重建，这可能导致细节差或浮动伪影。为了解决这个问题，我们建议根据能见度标准增加更多的相关摄像头。给定一个待选相机Ci，设Ωij为图像Ii中第j个单元格的投影面积，设Ωi为图像Ii的面积;可见性定义为Ωij/Ωi。选择可见性值大于预定义阈值Th的摄像机。
+## 数据集
+1. `Urbanscene3D`: https://github.com/Linxius/UrbanScene3D
 
-请注意，计算Ωij的不同方法会导致不同的相机选择。如图3(e)所示，一个自然朴素的解决方案是基于分布在物体表面的三维点。它们投射在Ii上，形成区域Ω surf ij的凸壳。这种计算是不考虑空气空间的，因为它只考虑了表面。因此在本次计算中，部分相关摄像机在第j个单元格上的可见度较低，因此没有被选中，导致空域监管不足，无法压制空中悬浮物。
+2. `Mill-19`: https://opendatalab.com/OpenDataLab/Mill_19/tree/main/raw
 
-我们引入了空域感知的能见度计算，如图3(f)所示。具体来说，第j个单元格中的点云形成一个轴线对齐的边界框，其高度选取为最高点到地平面的距离。我们将边界框投影到Ii上，得到一个凸壳区域Ω air ij。空域感知方案综合考虑了所有可见空间，确保在给定合适的可见阈值的情况下，选择对该单元格优化有重要贡献的视点，并为空域提供足够的监管。该空域感知解决方案考虑了所有可见空间，确保给定适当的可见阈值，选择对该单元优化有重大贡献的视图，并为空域提供足够的监督。
-
-### Coverage-based point selection 基于覆盖率的点选择
-
-在将更多的相关摄像机添加到第j个单元格的摄像机集Vj之后，我们将Vj中所有视图覆盖的点添加到Pj中，如图3(d)所示。新选取的点可以为单元格的优化提供更好的初始化。如图3(g)所示，第j个单元格外的一些物体可以被Vj中的一些视图捕获，并且由于深度模糊性，在没有适当初始化的情况下，新的3D高斯分布会在错误的位置生成以适应这些物体。然而，通过添加这些对象点进行初始化，可以很容易地创建正确位置的新的3D高斯模型，以适应这些训练视图，而不是在第j个单元格中产生floaters。请注意，在单元优化后，单元外生成的3D高斯分布被删除。
-
-## Decoupled Appearance Modeling 解耦外观建模
-
-![image-20240514141312191](http://typora-kpl.oss-cn-hangzhou.aliyuncs.com/202405141413243.png)
-
-![image-20240517125958141](http://typora-kpl.oss-cn-hangzhou.aliyuncs.com/202405171259245.png)
-
-![image-20240514141401517](http://typora-kpl.oss-cn-hangzhou.aliyuncs.com/202405141414563.png)
-
-解耦外观建模中的CNN架构如图9所示。我们对形状为3xHxW的渲染图像进行32次下采样，然后将长度为64的外观嵌入到下采样图像的每个像素上，得到形状为3xH/32xW/32的特征映射Di，并将其馈送到CNN
-
-Di首先通过一个3x3卷积层，将其通道深度增加到256。然后通过4个上采样块进行处理，每个上采样块包含一个上采样像素shuffle层，一个3x3卷积层和ReLU激活。每个上采样块将特征映射分辨率加倍，并将其通道深度减半。然后，通过双线性插值层将特征映射上采样到hw，再通过两个带有ReLU的3x3卷积层得到形状为3xHxW的变换映射，用于对渲染后的图像进行外观调整。
-
-## Seamless Merging 无缝合并
-
-在独立优化所有单元格后，我们需要将它们合并以得到一个完整的场景。对于每个优化单元，我们在边界扩展之前删除原始区域外的3D高斯分布(图3(a))。否则，它们可能会在其他细胞中漂浮。然后，合并这些不重叠细胞的3D高斯分布。合并后的场景在外观和几何上是无缝的，没有明显的边界伪影，因为在数据划分中，相邻单元之间有一些训练视图是共同的。因此，不需要像Block-NeRF[41]那样进行进一步的外观调整。合并后的场景中包含的3D高斯分布的总数可以大大超过作为一个整体训练的场景的总数，从而提高重建质量。
+3. 测试数据: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip

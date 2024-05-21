@@ -65,7 +65,7 @@ class DecoupleAppearanceModel(nn.Module):
         # print("transformation_map", transformation_map)
         # print("min:", transformation_map.min(), " max:", transformation_map.max())
 
-        transformation_map = torch.sigmoid(transformation_map_temp)
+        transformation_map = torch.sigmoid(transformation_map_temp)  # TODO: 如果不使用sigmoid，可视化的转换图颜色会非常奇怪，不是灰色的，而是一片绿色或者蓝色等, 暂不清楚原因
 
         decouple_image = rendered_image * transformation_map  # 将渲染图像乘以变换图 得到外观解耦后的图像
         return decouple_image, transformation_map

@@ -138,7 +138,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     DAM_optimizer.step()
                     DAM_scheduler.step()
 
-                # 没500轮保存一次中间外观解耦图像
+                # 每500轮保存一次中间外观解耦图像
                 if iteration % 100 == 0:
                     decouple_image = decouple_image.cpu()
                     decouple_image = transforms.ToPILImage()(decouple_image)
@@ -266,7 +266,7 @@ def train_main():
     parser.add_argument("--test_iterations", nargs="+", type=int,
                         default=[7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
     parser.add_argument("--save_iterations", nargs="+", type=int,
-                        default=[50, 100, 1000, 7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
+                        default=[7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
     parser.add_argument("--quiet", default=False)  # 标记以省略写入标准输出管道的任何文本。
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])  # 空格分隔的迭代，在其中存储稍后继续的检查点，保存在模型目录中。
     parser.add_argument("--start_checkpoint", type=str, default=None)  # 路径保存检查点继续训练。

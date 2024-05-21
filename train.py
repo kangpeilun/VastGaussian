@@ -17,8 +17,8 @@ from random import randint
 from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
 import sys
-# from scene import Scene, GaussianModel
-from VastGaussian_scene.datasets import Scene, GaussianModel
+from scene import Scene, GaussianModel
+# from VastGaussian_scene.datasets import Scene, GaussianModel
 from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
@@ -42,7 +42,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset)
-    DAModel = DecoupleAppearanceModel().cuda()  # 定义外观解耦模型
+    # DAModel = DecoupleAppearanceModel().cuda()  # 定义外观解耦模型
     scene = Scene(dataset, gaussians)  # 这段代码整个都是加载数据集，同时包含高斯模型参数的加载
     gaussians.training_setup(opt)
     DAM_optimizer, DAM_scheduler = DAModel.optimize(DAModel)
@@ -102,11 +102,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg[
             "viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         # 外观解耦模型
-        decouple_image, transformation_map = DAModel(image)
+        # decouple_image, transformation_map = DAModel(image)
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()  # 获取ground truth图像
-        # Ll1 = l1_loss(image, gt_image)
-        Ll1 = l1_loss(decouple_image, gt_image)  # 使用外观解耦后的图像与gt计算损失
+        Ll1 = l1_loss(image, gt_image)
+        # Ll1 = l1_loss(decouple_image, gt_image)  # 使用外观解耦后的图像与gt计算损失
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (
                     1.0 - ssim(image, gt_image))  # loss = L1_loss + SSIM_loss(图像质量损失)  lambda_dssim控制ssim对总损失的影响，默认为0.2
         loss.backward()
@@ -152,21 +152,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 DAM_optimizer.step()
                 DAM_scheduler.step()
 
-            # 没500轮保存一次中间外观解耦图像
-            if iteration % 100 == 0:
-                decouple_image = decouple_image.cpu()
-                decouple_image = transforms.ToPILImage()(decouple_image)
-                save_dir = os.path.join(scene.model_path, "decouple_images")
-                if not os.path.exists(save_dir): os.makedirs(save_dir)
-                decouple_image.save(f"{save_dir}/decouple_image_{viewpoint_cam.uid}_{iteration}.png")
-
-                transformation_map = transformation_map.cpu()
-                transformation_map = transforms.ToPILImage()(transformation_map)
-                transformation_map.save(f"{save_dir}/transformation_map_{viewpoint_cam.uid}_{iteration}.png")
-
-                image = image.cpu()
-                image = transforms.ToPILImage()(image)
-                image.save(f"{save_dir}/render_image_{viewpoint_cam.uid}_{iteration}.png")
+            # # 每500轮保存一次中间外观解耦图像
+            # if iteration % 100 == 0:
+            #     decouple_image = decouple_image.cpu()
+            #     decouple_image = transforms.ToPILImage()(decouple_image)
+            #     save_dir = os.path.join(scene.model_path, "decouple_images")
+            #     if not os.path.exists(save_dir): os.makedirs(save_dir)
+            #     decouple_image.save(f"{save_dir}/decouple_image_{viewpoint_cam.uid}_{iteration}.png")
+            #
+            #     transformation_map = transformation_map.cpu()
+            #     transformation_map = transforms.ToPILImage()(transformation_map)
+            #     transformation_map.save(f"{save_dir}/transformation_map_{viewpoint_cam.uid}_{iteration}.png")
+            #
+            #     image = image.cpu()
+            #     image = transforms.ToPILImage()(image)
+            #     image.save(f"{save_dir}/render_image_{viewpoint_cam.uid}_{iteration}.png")
 
 
             if (iteration in checkpoint_iterations):
