@@ -39,6 +39,7 @@
 > `decouple_appearance_model.py` 外观解耦模块，对应论文 `Decoupled Appearance Modeling`
 > ![img.png](image/img.png)!
 > ![img_2.png](image/img_2.png)
+> 
 > `graham_scan.py` 凸包计算，用于在实现Visibility-based camera selection时，将partition后的立方体投影到相机平面上，并计算投影区域与图片区域的交集
 > 
 > `seamless_merging.py` 无缝合并，对应论文 `Seamless Merging`，将各个PartitionScene合并成BigScene
@@ -48,7 +49,7 @@
 5. 论文中提到进行`曼哈顿世界对齐，使世界坐标的y轴垂直于地平面`，我在询问高人才知道，这个东西可以使用CloudCompare软件进行手动调整，其大体过程就是将点云所在的区域的包围盒边界调整到与点云区域的整体朝向保持平行
 > 比如下图中的点云原本是倾斜的，经过调整好变成水平和垂直的，高人说是曼哈顿世界对其是大尺度三维重建的基本操作(方便进行partition)，哈哈
 > ![img_4.png](image/img_4.png)![img_5.png](image/img_5.png)
-6. 我在实现过程中使用的是3DGS提供的小范围数据进行的测试，较大的数据本机跑不了
+6. 我在实现过程中使用的是3DGS提供的小范围数据进行的测试，较大的数据本机跑不了，大范围的数据根据论文的说明至少要32G显存
 
 7. 在实现过程中，在论文中的一些操作，作者并没有很明确的说明细节，因此一些实现是根据我的猜测和理解去完成的，也因此我的实现可能会有一些bug，并且有些实现在高手看来可能有些蠢，如果大家在使用过程中发现有问题，请及时联系我，一起进步
 
