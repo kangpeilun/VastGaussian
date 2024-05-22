@@ -14,14 +14,14 @@ This it the [ENGLISH](ENGLISH.md) Version.
 > WeChat: k374774222
 
 ## ToDo List
-1. [x] 实现Camera-position-based region division
-2. [x] 实现Position-based data selection
-3. [x] 实现Visibility-based camera selection
-4. [x] 实现Coverage-based point selection
-5. [x] 实现Decoupled Appearance Modeling
-6. [x] 实现Seamless Merging
-6. [ ] 实现将点云进行division后，m*n个region在单GPU上的并行训练
-7. [ ] 在UrbanScene3D和Mill-19数据集上进行实验
+- [x] 实现Camera-position-based region division
+- [x] 实现Position-based data selection
+- [x] 实现Visibility-based camera selection
+- [x] 实现Coverage-based point selection
+- [x] 实现Decoupled Appearance Modeling
+- [x] 实现Seamless Merging
+- [ ] 实现将点云进行division后，m*n个region在单GPU上的并行训练
+- [ ] 在UrbanScene3D和Mill-19数据集上进行实验
 
 ## 说明
 
