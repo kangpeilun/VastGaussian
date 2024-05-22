@@ -1,11 +1,12 @@
 # VastGaussian
+This is [Chinese](CHINESE.md) Version.
 
 ![img.png](image/img_.png)
 
-这是`VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction`的非官方实现，因为是第一次从头复现完整的代码，因此代码可能会出现一些错误，并且代码的写法和一些高手相比可能会显得有些幼稚，缺少一些工程上的技巧。
-不过我也迈出了自己的第一步，因为我在网络上找不到任何关于VastGaussian的任何实现，于是我进行了一下尝试。
+This is `VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction` unofficial implementation, since this is my first time to recreate the complete code from scratch, the code may have some errors, and the code writing may seem a bit naive compared to some experts. Lack of engineering skills. But I got my foot in the door. I couldn't find any implementation of VastGaussian on the web, so I gave it a try.
 
-如果大家在使用过程中有任何代码修改方面的经验和反馈，反应联系我，或者简单的提出你的Issue：
+If you have any experiences and feedback on any code changes, feel free to contact me, or simply raise an Issue :grinning::
+
 > Email: 374774222@qq.com
 > 
 > QQ: 374774222
@@ -13,56 +14,71 @@
 > WeChat: k374774222
 
 ## ToDo List
-1. [x] 实现Camera-position-based region division
-2. [x] 实现Position-based data selection
-3. [x] 实现Visibility-based camera selection
-4. [x] 实现Coverage-based point selection
-5. [x] 实现Decoupled Appearance Modeling
-6. [x] 实现Seamless Merging
-6. [ ] 实现将点云进行division后，m*n个region在单GPU上的并行训练
-7. [ ] 在UrbanScene3D和Mill-19数据集上进行实验
+- [x] Camera-position-based region division is implemented
 
-## 说明
+- [x] Position-based data selection is implemented
 
-1. 我在原始的3DGS上进行了修改，首先我将3DGS的超参数从`arguments/__init__.py`中摘取了出来放在了`arguments/parameters.py`文件里，更加方便阅读和理解超参的含义
+- [x] Visibility-based camera selection is implemented
 
-2. 为了不改变3DGS原本的目录结构，我新添加了一个`VastGaussian_scene`用于存放VastGaussian的模块，其中一部分代码我调用了`scene`文件夹中已有的函数，同时为了解决`import`的错误，我将Scene类移动到了datasets.py文件夹里
-![img.png](image/img2.png)
-![img_1.png](image/img_1.png)
-3. 文件的命名与论文中提到的方法保持一致，方便阅读
+- [x] Coverage-based point selection is implemented
 
-> `datasets.py` 我对3DGS中的Scene类进行了重写，分成BigScene和PartitionScene，前者表示原始的场景BigScene，后者表示经过Partition后的各个小场景PartitionScene
+- [x] Decoupled Appearance Modeling is implemented
+
+- [x] Seamless Merging is implemented
+
+- [ ] Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud
+
+- [ ] Experiments are carried out on UrbanScene3D and Mill-19 datasets
+- [ ] Fix bugs, and bugs, and bugs ...
+
+## Some notes
+
+1. I made some changes to the original 3DGS. First of all, I took the hyperparameters of 3DGS from `arguments/__init__.py` and put them into `arguments/parameters.py` file to make it easier to read and understand the hyperparameters
+2. In order not to change the original directory structure of 3DGS, I added a new `VastGaussian_scene` module to store VastGaussian. Part of the code I called the existing functions in the `scene` folder. Also to fix the `import` error, I moved the Scene class into the datasets.py folder
+
+<div align="center">
+    <img src=image/img2.png align="center"> 
+    <img src=image/img_1.png align="center">
+</div>
+
+3. The naming of the files is consistent with the method mentioned in the paper for easy reading
+
+> 1. `datasets.py` I have rewritten the Scene class in 3DGS into BigScene and PartitionScene. The former represents the original scene BigScene, and the latter represents the PartitionScene of each small scene after Partition.
+>2. `data_partition.py` corresponding to the `Progressive Data Partitioning` in the paper.
+> 
+><img src=image/img_3.png align="center" width=800>
+> 
+>3. `decouple_appearance_model.py`  corresponding to the `Decoupled Appearance Modeling` in the paper.
+> 
+><div align="center">
+>  <img src=image/img.png align="center" height=400>
+>     <img src=image/img_2.png align="center" width=400>
+>    </div> 
+> 4. `graham_scan.py` convex hull calculation is used to project the partition cube onto the camera plane and calculate the intersection of the projected region and the image region when implementing Visibility based camera selection.
+>5. `seamless_merging.py` corresponding to the `Seamless Merging` in the paper.
+
+4. I have added a new file `train_vast.py` to modify the process of training VastGaussian, if you want to train the original 3DGS, please use `train.py`
+5. The paper mentioned `Manhattan world alignment, so that the Y-axis of the world coordinate is perpendicular to the ground plane`, I asked the experts to know that this thing can be adjusted manually using `CloudCompare software`, the general process is to adjust the bounding box boundary of the point cloud region to keep parallel to the overall orientation of the point cloud region. **In my implementation, I assume that this step is done ahead of time.**
+6. 比如下图中的点云原本是倾斜的，经过调整好变成水平和垂直的，高人说是曼哈顿世界对其是大尺度三维重建的基本操作(方便进行partition)，哈哈
+> For example, the point cloud in the following picture was originally tilted, but after adjusting it to become horizontal and vertical, the high person said that Manhattan World is the basic operation for large-scale 3D reconstruction (convenient partition), 😹
 >
-> `data_partition.py` 数据分区，对应论文 `Progressive Data Partitioning`
-> ![img_3.png](image/img_3.png)
-> 
-> `decouple_appearance_model.py` 外观解耦模块，对应论文 `Decoupled Appearance Modeling`
-> ![img.png](image/img.png)!
-> ![img_2.png](image/img_2.png)
-> 
-> `graham_scan.py` 凸包计算，用于在实现Visibility-based camera selection时，将partition后的立方体投影到相机平面上，并计算投影区域与图片区域的交集
-> 
-> `seamless_merging.py` 无缝合并，对应论文 `Seamless Merging`，将各个PartitionScene合并成BigScene
+> <div align="center">
+>  <img src=image/img_4.png height=300>
+>  <img src=image/img_5.png height=300>
+> </div>
+7. In the process of implementation, I used a small range of data provided by 3DGS for testing. Larger data can not run on the native computer, and a large range of data requires at least **32G video memory** according to the instructions of the paper
+7. In the implementation process, some operations in the paper, the author is not very clear about the details, so some implementation is based on my guess and understanding to complete, so my implementation may have some bugs, and some implementation may be a little stupid in the eyes of the expert, if you find problems in the use of the process, please contact me in time, progress together.
 
-4. 我新增了一个`train_vast.py`文件，对训练VastGaussian的过程进行了修改，如果想对原始的3DGS进行训练，请使用`train.py`
+## Using
 
-5. 论文中提到进行`曼哈顿世界对齐，使世界坐标的y轴垂直于地平面`，我在询问高人才知道，这个东西可以使用CloudCompare软件进行手动调整，其大体过程就是将点云所在的区域的包围盒边界调整到与点云区域的整体朝向保持平行
-> 比如下图中的点云原本是倾斜的，经过调整好变成水平和垂直的，高人说是曼哈顿世界对其是大尺度三维重建的基本操作(方便进行partition)，哈哈
-> ![img_4.png](image/img_4.png)![img_5.png](image/img_5.png)
-6. 我在实现过程中使用的是3DGS提供的小范围数据进行的测试，较大的数据本机跑不了，大范围的数据根据论文的说明至少要32G显存
-
-7. 在实现过程中，在论文中的一些操作，作者并没有很明确的说明细节，因此一些实现是根据我的猜测和理解去完成的，也因此我的实现可能会有一些bug，并且有些实现在高手看来可能有些蠢，如果大家在使用过程中发现有问题，请及时联系我，一起进步
-
-## 使用
-
-1. 数据格式和3DGS一样，同时训练的命令也和3DGS基本一样，我没有进行什么太多个性化的修改，你可以参考下面的命令(更多的参数请参考`arguments/parameters.py`):
+1. The data format is the same as 3DGS, and the training command is basically the same as 3DGS. I didn't make too many personalized changes, you can refer to the following command (see `arguments/parameters.py` for more parameters):
 ```python
-python train_vast.py -s output/dataset --exp_name test
+python train_vast.py -s datasets/xxx --exp_name test
 ```
 
-## 数据集
+## Datasets
 1. `Urbanscene3D`: https://github.com/Linxius/UrbanScene3D
 
 2. `Mill-19`: https://opendatalab.com/OpenDataLab/Mill_19/tree/main/raw
 
-3. 测试数据: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
+3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
