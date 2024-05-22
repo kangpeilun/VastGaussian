@@ -17,7 +17,7 @@ from random import randint
 from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
 import sys
-from scene import Scene, GaussianModel
+from scene.datasets import Scene, GaussianModel
 # from VastGaussian_scene.datasets import Scene, GaussianModel
 from utils.general_utils import safe_state
 import uuid
