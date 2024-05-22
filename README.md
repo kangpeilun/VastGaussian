@@ -55,7 +55,8 @@ If you have any experiences and feedback on any code changes, feel free to conta
 >     <img src=image/img_2.png align="center" width=400>
 >    </div> 
 > - `graham_scan.py` convex hull calculation is used to project the partition cube onto the camera plane and calculate the intersection of the projected region and the image region when implementing Visibility based camera selection.
->- `seamless_merging.py` corresponding to the `Seamless Merging` in the paper.
+> 
+> - `seamless_merging.py` corresponding to the `Seamless Merging` in the paper.
 
 4. I have added a new file `train_vast.py` to modify the process of training VastGaussian, if you want to train the original 3DGS, please use `train.py`
 5. The paper mentioned `Manhattan world alignment, so that the Y-axis of the world coordinate is perpendicular to the ground plane`, I asked the experts to know that this thing can be adjusted manually using `CloudCompare software`, the general process is to adjust the bounding box boundary of the point cloud region to keep parallel to the overall orientation of the point cloud region. **In my implementation, I assume that this step is done ahead of time.**
