@@ -1,6 +1,4 @@
 # VastGaussian
-This it the [ENGLISH](ENGLISH.md) Version.
-
 ![img.png](image/img_.png)
 
 这是`VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction`的非官方实现，因为是第一次从头复现完整的代码，因此代码可能会出现一些错误，并且代码的写法和一些高手相比可能会显得有些幼稚，缺少一些工程上的技巧。
