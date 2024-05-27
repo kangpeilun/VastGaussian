@@ -72,14 +72,9 @@ class BigScene:
             self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale,
                                                                            args)
 
-        # TODO：实现数据预处理
         DataPartitioning = ProgressiveDataPartitioning(scene_info, self.train_cameras[resolution_scales[0]],
                                                        self.model_path)
         self.partition_data = DataPartitioning.format_data()  # 数据分区
-        # self.train_cameras[resolution_scale] = format_data['1_1']['cameras']  # 通过这样的方式将数据取出来
-        # self.gaussians.create_from_pcd(format_data['1_1']['point_cloud'], self.cameras_extent)
-
-        # TODO: 编写代码实现m*n个partition并行训练
 
         # if self.loaded_iter:
         #     self.gaussians.load_ply(os.path.join(self.model_path,
