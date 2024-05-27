@@ -40,7 +40,7 @@ def ModelParams(parser):
 
 def OptimizationParams(parser):
     # 下面是OptimizationParams，使用默认值即可
-    parser.add_argument("--iterations", type=int, default=100)  # 要训练的总迭代数，默认为30_000。
+    parser.add_argument("--iterations", type=int, default=30_000)  # 要训练的总迭代数，默认为30_000。
     parser.add_argument("--feature_lr", type=float, default=0.0025)  # 球面谐波具有学习率，默认为0.0025。
     parser.add_argument("--opacity_lr", type=float, default=0.05)  # 不透明学习率默认为0.05。
     parser.add_argument("--scaling_lr", type=float, default=0.005)  # 缩放学习率默认为0.005。
