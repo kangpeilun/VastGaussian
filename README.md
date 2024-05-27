@@ -5,13 +5,6 @@ This is [Chinese](CHINESE.md) Version.
 
 This is `VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction` unofficial implementation, since this is my first time to recreate the complete code from scratch, the code may have some errors, and the code writing may seem a bit naive compared to some experts. Lack of engineering skills. But I got my foot in the door. I couldn't find any implementation of VastGaussian on the web, so I gave it a try.
 
-If you have any experiences and feedback on any code changes, feel free to contact me, or simply raise an Issue :grinning::
-
-> Email: 374774222@qq.com
-> 
-> QQ: 374774222
-> 
-> WeChat: k374774222
 
 ## ToDo List
 - [x] ~~Camera-position-based region division is implemented~~

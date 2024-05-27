@@ -213,11 +213,11 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
     # Report test and samples of training set
     if iteration in testing_iterations:
         torch.cuda.empty_cache()
-        validation_configs = (
+        validation_configs = [
             # {'name': 'test', 'cameras': scene.getTestCameras()},
                               {'name': 'train',
                                'cameras': [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in
-                                           range(5, 30, 5)]})
+                                           range(5, 30, 5)]}]
 
         for config in validation_configs:
             if config['cameras'] and len(config['cameras']) > 0:
@@ -265,7 +265,7 @@ def train_main():
     parser.add_argument("--debug_from", type=int, default=-1)  # 调试缓慢。您可以指定一个迭代(从0开始)，之后上述调试变为活动状态。
     parser.add_argument("--detect_anomaly", default=False)  #
     parser.add_argument("--test_iterations", nargs="+", type=int,
-                        default=[7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
+                        default=[10, 7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
     parser.add_argument("--save_iterations", nargs="+", type=int,
                         default=[7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
     parser.add_argument("--quiet", default=False)  # 标记以省略写入标准输出管道的任何文本。
