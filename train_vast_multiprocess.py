@@ -165,7 +165,7 @@ def aggregate(global_W, local_Ws, n_workers):
         for name, value in local_Ws[rank].items():
             global_W[name].data += value.data
 
-    for name in local_Ws[rank].keys():
+    for name in local_Ws[rank].keys():  # 这里只是用于取出模型的参数名而以，因此不用纠结于是第几个local_Ws
         global_W[name].data /= n_workers
 
 
