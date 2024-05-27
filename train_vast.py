@@ -134,9 +134,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.optimizer.step()
                     gaussians.optimizer.zero_grad(set_to_none=True)
 
-                    DAM_optimizer.zero_grad()
                     DAM_optimizer.step()
                     DAM_scheduler.step()
+                    DAM_optimizer.zero_grad()
 
                 # 每500轮保存一次中间外观解耦图像
                 if iteration % 100 == 0:
