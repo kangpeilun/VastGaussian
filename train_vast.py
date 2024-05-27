@@ -40,7 +40,7 @@ except ImportError:
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     tb_writer = prepare_output_and_logger(dataset)
-    DAModel = DecoupleAppearanceModel().cuda()  # 定义外观解耦模型
+    DAModel = DecoupleAppearanceModel().to(dataset.data_device)  # 定义外观解耦模型
     big_scene = BigScene(dataset)  # 这段代码整个都是加载数据集，同时包含高斯模型参数的加载
     DAM_optimizer, DAM_scheduler = DAModel.optimize(DAModel)
     # if checkpoint:
@@ -48,14 +48,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     #     gaussians.restore(model_params, opt)
 
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
-    background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+    background = torch.tensor(bg_color, dtype=torch.float32, device=dataset.data_device)
 
     iter_start = torch.cuda.Event(enable_timing=True)
     iter_end = torch.cuda.Event(enable_timing=True)
 
     for partition_id in range(len(big_scene.partition_data)):
         gaussians = GaussianModel(dataset)
-        partition_scene = PartitionScene(dataset, gaussians, partition_id, big_scene.partition_data[partition_id], big_scene.cameras_extent)
+        partition_scene = PartitionScene(dataset, gaussians, partition_id, big_scene.partition_data[partition_id],
+                                         big_scene.cameras_extent)
         gaussians.training_setup(opt)
 
         viewpoint_stack = None
@@ -94,7 +95,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # Ll1 = l1_loss(image, gt_image)
             Ll1 = l1_loss(decouple_image, gt_image)  # 使用外观解耦后的图像与gt计算损失
             loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (
-                        1.0 - ssim(image, gt_image))  # loss = L1_loss + SSIM_loss(图像质量损失)  lambda_dssim控制ssim对总损失的影响，默认为0.2
+                    1.0 - ssim(image, gt_image))  # loss = L1_loss + SSIM_loss(图像质量损失)  lambda_dssim控制ssim对总损失的影响，默认为0.2
             loss.backward()
 
             iter_end.record()
@@ -124,9 +125,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:  # 当迭代次数大于500,并且迭代次数能够整除100时，每隔100个迭代对点云进行优化
                         size_threshold = 20 if iteration > opt.opacity_reset_interval else None
-                        gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, partition_scene.cameras_extent, size_threshold)
+                        gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, partition_scene.cameras_extent,
+                                                    size_threshold)
 
-                    if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
+                    if iteration % opt.opacity_reset_interval == 0 or (
+                            dataset.white_background and iteration == opt.densify_from_iter):
                         gaussians.reset_opacity()
 
                 # Optimizer step
@@ -134,9 +137,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.optimizer.step()
                     gaussians.optimizer.zero_grad(set_to_none=True)
 
-                    DAM_optimizer.zero_grad()
                     DAM_optimizer.step()
                     DAM_scheduler.step()
+                    DAM_optimizer.zero_grad()
 
                 # 每500轮保存一次中间外观解耦图像
                 if iteration % 100 == 0:
@@ -148,17 +151,17 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     transformation_map = transformation_map.cpu()
                     transformation_map = transforms.ToPILImage()(transformation_map)
-                    transformation_map.save(f"{save_dir}/transformation_map_{partition_id}_{viewpoint_cam.uid}_{iteration}.png")
+                    transformation_map.save(
+                        f"{save_dir}/transformation_map_{partition_id}_{viewpoint_cam.uid}_{iteration}.png")
 
                     image = image.cpu()
                     image = transforms.ToPILImage()(image)
                     image.save(f"{save_dir}/render_image_{partition_id}_{viewpoint_cam.uid}_{iteration}.png")
 
-
                 if (iteration in checkpoint_iterations):
                     print("\n[ITER {}] Saving Checkpoint".format(iteration))
-                    torch.save((gaussians.capture(), iteration), partition_scene.model_path + "/chkpnt" + str(iteration) + ".pth")
-
+                    torch.save((gaussians.capture(), iteration),
+                               partition_scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
     # seamless_merging 无缝合并
     print("Merging Partitions...")
@@ -203,7 +206,8 @@ def prepare_output_and_logger(args):
     return tb_writer
 
 
-def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene: PartitionScene, renderFunc,
+def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene: PartitionScene,
+                    renderFunc,
                     renderArgs):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -213,10 +217,11 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
     # Report test and samples of training set
     if iteration in testing_iterations:
         torch.cuda.empty_cache()
-        validation_configs = ({'name': 'test', 'cameras': scene.getTestCameras()},
-                              {'name': 'train',
-                               'cameras': [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in
-                                           range(5, 30, 5)]})
+        validation_configs = (
+            # {'name': 'test', 'cameras': scene.getTestCameras()},
+            {'name': 'train',
+             'cameras': [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in
+                         range(5, 30, 5)]})
 
         for config in validation_configs:
             if config['cameras'] and len(config['cameras']) > 0:
@@ -289,5 +294,3 @@ def train_main():
 
 if __name__ == "__main__":
     train_main()
-
-

@@ -11,7 +11,7 @@
 
 import torch
 from torchvision import transforms
-from scene import Scene
+from scene.datasets import Scene
 import os
 from tqdm import tqdm
 from os import makedirs

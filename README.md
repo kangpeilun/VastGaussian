@@ -46,7 +46,7 @@ If you have any experiences and feedback on any code changes, feel free to conta
 > - `datasets.py` I have rewritten the Scene class in 3DGS into BigScene and PartitionScene. The former represents the original scene BigScene, and the latter represents the PartitionScene of each small scene after Partition.
 > - `data_partition.py` corresponding to the `Progressive Data Partitioning` in the paper.
 > 
-> <img src=image/img_3.png align="center" width=800>
+>  <img src=image/img_3.png align="center" width=800>
 > 
 > - `decouple_appearance_model.py`  corresponding to the `Decoupled Appearance Modeling` in the paper.
 >  

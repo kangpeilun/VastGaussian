@@ -27,7 +27,7 @@ def ModelParams(parser):
     # 如果未设置且输入图像宽度超过1.6K像素，则输入将自动重新缩放到此目标。
     parser.add_argument("--resolution", "-r", type=int, default=-1)  # -1
     parser.add_argument("--data_device", type=str,
-                        default="cuda")  # 指定源图像数据的位置，默认为cuda，如果在大型/高分辨率数据集上训练，建议使用cpu，将减少VRAM消耗，但会稍微减慢训练速度。
+                        default="cuda:0")  # 指定源图像数据的位置，默认为cuda，如果在大型/高分辨率数据集上训练，建议使用cpu，将减少VRAM消耗，但会稍微减慢训练速度。
     parser.add_argument("--white_background", "-w", type=bool, default=False)  # 添加此标志以使用白色背景而不是黑色(默认)，例如，用于评估NeRF合成数据集。
     parser.add_argument("--sh_degree", type=int, default=3)  # 要使用的球面谐波阶数(不大于3)。默认为3。
 
