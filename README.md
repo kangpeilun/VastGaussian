@@ -19,9 +19,10 @@ This is `VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction` unoffic
 
 - [x] ~~Seamless Merging is implemented~~
 
-- [ ] Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud
+- [ ] Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud. (`I tried to modify it, but it's actually a little more difficult than I thought, can someone help me`)
 
 - [ ] Experiments are carried out on UrbanScene3D and Mill-19 datasets
+- [ ] `Training large datasets like Mill-19 consumes a lot of RAM, can someone give me some suggestions for optimizing the code`
 - [ ] Fix bugs, and bugs, and bugs ...
 
 ## Some notes
