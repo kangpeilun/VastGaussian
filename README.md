@@ -77,3 +77,15 @@ python train_vast.py -s datasets/xxx --exp_name test
 2. `Mill-19`: https://opendatalab.com/OpenDataLab/Mill_19/tree/main/raw
 
 3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
+
+
+# Contributors
+Happily, we now have several contributors working on the project, and we welcome more contributors to join us to improve the project. Thank you all for your work.
+
+<a href="https://github.com/Livioni">
+  <img src="https://avatars.githubusercontent.com/u/52649461?v=4" height="75" width="75"/>
+</a>
+
+<a href="https://github.com/VerseWei">
+  <img src="https://avatars.githubusercontent.com/u/102359772?v=4" height="75" width="75"/>
+</a>
