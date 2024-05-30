@@ -38,10 +38,11 @@ class CameraPartition(NamedTuple):
 
 class ProgressiveDataPartitioning:
     # 渐进数据分区
-    def __init__(self, scene_info, train_cameras, model_path, m_region=2, n_region=4, extend_rate=0.2,
+    def __init__(self, scene_info, train_cameras, model_path, m_region=2, n_region=2, extend_rate=0.2,
                  visible_rate=0.25):
         self.partition_scene = None
         self.pcd = scene_info.point_cloud
+        # print(f"self.pcd={self.pcd}")
         self.model_path = model_path  # 存放模型位置
         self.partition_dir = os.path.join(model_path, "partition_point_cloud")
         self.partition_ori_dir = os.path.join(self.partition_dir, "ori")
@@ -71,7 +72,7 @@ class ProgressiveDataPartitioning:
 
 
     def save_partition_data(self):
-        """将partition后的数据序列化保存起来，方便下次加载"""
+        """将partition后的数据序列化保存起来, 方便下次加载"""
         with open(self.save_partition_data_dir, 'wb') as f:
             pickle.dump(self.partition_scene, f)
 
@@ -83,12 +84,12 @@ class ProgressiveDataPartitioning:
 
     def Camera_position_based_region_division(self, train_cameras):
         """1.基于相机位置的区域划分
-        思路：1.首先将整个场景的相机坐标投影到以xz轴组成的平面上
-             2.按照x轴方向，将所有的相机分成m部分
-             3.按照z轴方向，将每一部分分成n部分 (默认将整个区域分成2*4=8个部分),同时保证mxn个部分中的相机数量的均衡
+        思路: 1.首先将整个场景的相机坐标投影到以xz轴组成的平面上
+             2.按照x轴方向, 将所有的相机分成m部分
+             3.按照z轴方向, 将每一部分分成n部分 (默认将整个区域分成2*4=8个部分),同时保证mxn个部分中的相机数量的均衡
              4.返回每个部分的边界坐标，以及每个部分对应的相机
         """
-        m, n = self.m_region, self.n_region
+        m, n = self.m_region, self.n_region    # m=2, n=4
         CameraPose_list = []
         for idx, camera in enumerate(train_cameras):
             CameraPose_list.append(
@@ -99,6 +100,7 @@ class ProgressiveDataPartitioning:
         total_camera = len(CameraPose_list)  # 获取相机总数
         num_of_camera_per_m_partition = total_camera // m  # m个部分，每部分相机数量
         sorted_CameraPose_by_x_list = sorted(CameraPose_list, key=lambda x: x.pose[0])  # 按照x轴坐标排序
+        # print(sorted_CameraPose_by_x_list)
         for i in range(m):  # 按照x轴将所有相机分成m部分
             m_partition_dict[str(i + 1)] = sorted_CameraPose_by_x_list[
                                            i * num_of_camera_per_m_partition:(i + 1) * num_of_camera_per_m_partition]
@@ -135,16 +137,18 @@ class ProgressiveDataPartitioning:
         x_list = points[:, 0]
         y_list = points[:, 1]
         z_list = points[:, 2]
+        # print(points.shape)
         return [min(x_list), max(x_list),
                 min(y_list), max(y_list),
                 min(z_list), max(z_list)]
 
     def Position_based_data_selection(self, partition_dict):
-        """2.基于位置的数据选择
-        思路：1.计算每个partition的x z边界
-             2.然后按照extend_rate将每个partition的边界坐标扩展，得到新的边界坐标 [x_min, x_max, z_min, z_max]
-             3.根据extend后的边界坐标，获取该部分对应的点云
-        问题：有可能根据相机确定边界框后，仍存在一些比较好的点云没有被选中的情况，因此extend_rate是一个超参数，需要根据实际情况调整
+        """
+        2.基于位置的数据选择
+        思路: 1.计算每个partition的x z边界
+             2.然后按照extend_rate将每个partition的边界坐标扩展, 得到新的边界坐标 [x_min, x_max, z_min, z_max]
+             3.根据extend后的边界坐标, 获取该部分对应的点云
+        问题: 有可能根据相机确定边界框后, 仍存在一些比较好的点云没有被选中的情况, 因此extend_rate是一个超参数, 需要根据实际情况调整
         :param extend_rate: 拓展比例, 默认0.2
         :return partition_list: 每个部分对应的点云，所有相机，边界
         """
@@ -162,8 +166,12 @@ class ProgressiveDataPartitioning:
                                   max_x + self.extend_rate * (max_x - min_x),
                                   min_z - self.extend_rate * (max_z - min_z),
                                   max_z + self.extend_rate * (max_z - min_z)]
+            print(ori_camera_bbox)
+            # print(extend_camera_bbox)
             # 获取该部分对应的点云
+            # print('WXS', pcd)
             points, colors, normals = self.extract_point_cloud(pcd, ori_camera_bbox)  # 分别提取原始边界内的点云，和拓展边界后的点云
+            # print('WXS', points)
             points_extend, colors_extend, normals_extend = self.extract_point_cloud(pcd, extend_camera_bbox)
             # 论文中说点云围成的边界框的高度选取为最高点到地平面的距离，但在本实现中，因为不确定地平面位置，(可视化中第平面不用坐标轴xz重合)
             # 因此使用整个点云围成的框作为空域感知的边界框
