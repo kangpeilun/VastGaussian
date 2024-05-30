@@ -5,6 +5,13 @@ This is [Chinese](CHINESE.md) Version.
 
 This is `VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction` unofficial implementation, since this is my first time to recreate the complete code from scratch, the code may have some errors, and the code writing may seem a bit naive compared to some experts. Lack of engineering skills. But I got my foot in the door. I couldn't find any implementation of VastGaussian on the web, so I gave it a try.
 
+If you have any experiences and feedback on any code changes, feel free to contact me, or simply raise an Issue :grinning::
+
+> Email: 374774222@qq.com
+> 
+> QQ: 374774222
+> 
+> WeChat: k374774222
 
 ## ToDo List
 - [x] ~~Camera-position-based region division is implemented~~
@@ -19,11 +26,13 @@ This is `VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction` unoffic
 
 - [x] ~~Seamless Merging is implemented~~
 
-- [ ] Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud. (`I tried to modify it, but it's actually a little more difficult than I thought, can someone help me`)
+- [x] ~~For non-standard scenes by manual Manhattan alignment
+
+- [ ] Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud
 
 - [ ] Experiments are carried out on UrbanScene3D and Mill-19 datasets
-- [ ] `Training large datasets like Mill-19 consumes a lot of RAM, can someone give me some suggestions for optimizing the code`
 - [ ] Fix bugs, and bugs, and bugs ...
+- [ ] Automatic ground estimation and Manhattan alignment
 
 ## Some notes
 
@@ -54,19 +63,18 @@ This is `VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction` unoffic
 > - `seamless_merging.py` corresponding to the `Seamless Merging` in the paper.
 
 4. I have added a new file `train_vast.py` to modify the process of training VastGaussian, if you want to train the original 3DGS, please use `train.py`
-5. The paper mentioned `Manhattan world alignment, so that the Y-axis of the world coordinate is perpendicular to the ground plane`, I asked the experts to know that this thing can be adjusted manually using `CloudCompare software`, the general process is to adjust the bounding box boundary of the point cloud region to keep parallel to the overall orientation of the point cloud region. **In my implementation, I assume that this step is done ahead of time.**
-> For example, the point cloud in the following picture was originally tilted, but after adjusting it to become horizontal and vertical, the high person said that Manhattan World is the basic operation for large-scale 3D reconstruction (convenient partition), 😹
->
-> <div align="center">
->  <img src=image/img_4.png height=300>
->  <img src=image/img_5.png height=300>
-> </div>
-7. In the process of implementation, I used a small range of data provided by 3DGS for testing. Larger data can not run on the native computer, and a large range of data requires at least **32G video memory** according to the instructions of the paper
+5. The paper mentioned `Manhattan world alignment, so that the Y-axis of the world coordinate is perpendicular to the ground plane`, I asked the experts to know that this thing can be adjusted manually using `threejs`: https://threejs.org/editor/, after manually adjusting the scene you get the --position and --rotation parameters, just take them as command line arguments and train**
+6. In the process of implementation, I used a small range of data provided by 3DGS for testing. Larger data can not run on the native computer, and a large range of data requires at least **32G video memory** according to the instructions of the paper
 7. In the implementation process, some operations in the paper, the author is not very clear about the details, so some implementation is based on my guess and understanding to complete, so my implementation may have some bugs, and some implementation may be a little stupid in the eyes of the expert, if you find problems in the use of the process, please contact me in time, progress together.
 
 ## Using
 
 1. The data format is the same as 3DGS, and the training command is basically the same as 3DGS. I didn't make too many personalized changes, you can refer to the following command (see `arguments/parameters.py` for more parameters):
+if you want to perform manhattan alignment:
+```python
+python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --pos xx xx xx --rot xx xx xx
+```
+otherwise:
 ```python
 python train_vast.py -s datasets/xxx --exp_name test
 ```
@@ -77,15 +85,3 @@ python train_vast.py -s datasets/xxx --exp_name test
 2. `Mill-19`: https://opendatalab.com/OpenDataLab/Mill_19/tree/main/raw
 
 3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
-
-
-# Contributors
-Happily, we now have several contributors working on the project, and we welcome more contributors to join us to improve the project. Thank you all for your work.
-
-<a href="https://github.com/Livioni">
-  <img src="https://avatars.githubusercontent.com/u/52649461?v=4" height="75" width="75"/>
-</a>
-
-<a href="https://github.com/VerseWei">
-  <img src="https://avatars.githubusercontent.com/u/102359772?v=4" height="75" width="75"/>
-</a>
