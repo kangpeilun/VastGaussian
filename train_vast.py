@@ -25,7 +25,7 @@ from tqdm import tqdm
 from utils.image_utils import psnr
 from argparse import ArgumentParser, Namespace
 # from arguments import ModelParams, PipelineParams, OptimizationParams
-from arguments.parameters import ModelParams, PipelineParams, OptimizationParams, extract
+from arguments.parameters import ModelParams, PipelineParams, OptimizationParams, extract, create_man_rans
 
 from VastGaussian_scene.decouple_appearance_model import DecoupleAppearanceModel
 from VastGaussian_scene.seamless_merging import seamless_merge
@@ -251,13 +251,16 @@ def train_main():
     """重写训练主函数
     将原先隐式的参数进行显式化重写，方便阅读和调参
     代码主体与原先仍保持一致
-    参数详情见：arguments/parameters.py
+    参数详情见: arguments/parameters.py
     """
     parser = ArgumentParser(description="Training Script Parameters")
     # 三个模块里的参数
     lp = ModelParams(parser).parse_args()
     op, before_extract_op = extract(lp, OptimizationParams(parser).parse_args())
     pp, before_extract_pp = extract(before_extract_op, PipelineParams(parser).parse_args())
+
+    man_trans = create_man_rans(lp.pos, lp.rot)
+    lp.man_trans = man_trans
 
     # train.py脚本显式参数
     parser.add_argument("--ip", type=str, default='127.0.0.1')  # 启动GUI服务器的IP地址，默认为127.0.0.1。
@@ -274,6 +277,9 @@ def train_main():
     args = parser.parse_args()
     args.save_iterations.append(args.iterations)
     args.source_path = os.path.abspath(args.source_path)  # 将相对路径转换为绝对路径
+
+    if args.manhattan:
+        print("Need to perform Manhattan World Hypothesis based alignment")
 
     # Initialize system state (RNG)
     safe_state(args.quiet)

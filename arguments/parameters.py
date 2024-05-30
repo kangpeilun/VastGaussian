@@ -7,7 +7,9 @@
 # Email: 374774222@qq.com
 
 from argparse import ArgumentParser, Namespace
+import math
 import os
+import numpy as np
 
 """
     在原来的版本中，作者将所有的参数写入三个类中分别进行动态加载
@@ -15,7 +17,27 @@ import os
     因此我将所有的参数摘出来，重写了配置文件，只是修改了参数的呈现方式，
     并没有对代码整体的结构进行修改
 """
+def create_man_rans(position, rotation):
+    
+    # The angle is reversed because the counterclockwise direction is defined as negative in three.js
+    rot_x = np.array([[1, 0, 0],
+                      [0, math.cos(np.deg2rad(-rotation[0])), -math.sin(np.deg2rad(-rotation[0]))],
+                      [0, math.sin(np.deg2rad(-rotation[0])),  math.cos(np.deg2rad(-rotation[0]))]])
+    rot_y = np.array([[ math.cos(np.deg2rad(-rotation[1])), 0, math.sin(np.deg2rad(-rotation[1]))],
+                      [0, 1, 0],
+                      [-math.sin(np.deg2rad(-rotation[1])), 0, math.cos(np.deg2rad(-rotation[1]))]])
+    rot_z = np.array([[math.cos(np.deg2rad(-rotation[2])), -math.sin(np.deg2rad(-rotation[2])), 0],
+                      [math.sin(np.deg2rad(-rotation[2])),  math.cos(np.deg2rad(-rotation[2])), 0],
+                      [0, 0, 1]])
 
+    rot = rot_z @ rot_y @ rot_x
+    man_trans = np.zeros((4, 4))
+    man_trans[:3, :3] = rot.transpose()
+    man_trans[:3, -1] = np.array(position).transpose()
+    man_trans[3, 3] = 1
+        
+    return man_trans
+        
 
 def ModelParams(parser):
     # 这块是ModelParams，使用默认值即可，必须传入source_path参数
@@ -32,15 +54,25 @@ def ModelParams(parser):
     parser.add_argument("--sh_degree", type=int, default=3)  # 要使用的球面谐波阶数(不大于3)。默认为3。
 
     # 新增的可选参数，用于实验调整参数
-    parser.add_argument("--exp_name", type=str, default="exp", help="experiment name, if have the same name dir, mkdir a new one like exp_name_1, exp_name_2 ...")  # 为每次实验命名
-    parser.add_argument("--limited_range", type=float, default=0, help="是否限制致密化生成点云的范围，这样可以有效显示clone和split后生成点云的数量，且加快训练速度，"
-                                                                       "但是render的效果很差，默认为0表示不限制，0.5表示限制范围为原来的0.5倍，1.5表示限制范围为原始的1.5倍，以此类推")
+    parser.add_argument("--exp_name", type=str, default="building_downsample", help="experiment name, if have the same name dir, mkdir a new one like exp_name_1, exp_name_2 ...")  # 为每次实验命名
+    parser.add_argument("--limited_range", type=float, default=0, help="是否限制致密化生成点云的范围, 这样可以有效显示clone和split后生成点云的数量, 且加快训练速度，"
+                                                                       "但是render的效果很差, 默认为0表示不限制, 0.5表示限制范围为原来的0.5倍, 1.5表示限制范围为原始的1.5倍，以此类推")
+    parser.add_argument("--manhattan", action="store_true") # 是否需要曼哈顿对齐
+    parser.add_argument("--pos", nargs=3, type=float)       # 点云平移
+    parser.add_argument("--rot", nargs=3, type=float)       # 点云平移
+    parser.add_argument("--man_trans", default='')
+
+    # man_trans = np.array([[0.999934, 0.003912, 0.010757, -46.085182],
+    #                       [0.003630, -0.999651, 0.026173, 5.958979],
+    #                       [0.010855, -0.026132, -0.999600, -26.351984],
+    #                       [0.000000, 0.000000, 0.000000, 1.000000]])
+    # parser.add_argument("--man_trans", default=man_trans) 
     return parser
 
 
 def OptimizationParams(parser):
     # 下面是OptimizationParams，使用默认值即可
-    parser.add_argument("--iterations", type=int, default=30_000)  # 要训练的总迭代数，默认为30_000。
+    parser.add_argument("--iterations", type=int, default=7000)  # 要训练的总迭代数，默认为30_000。
     parser.add_argument("--feature_lr", type=float, default=0.0025)  # 球面谐波具有学习率，默认为0.0025。
     parser.add_argument("--opacity_lr", type=float, default=0.05)  # 不透明学习率默认为0.05。
     parser.add_argument("--scaling_lr", type=float, default=0.005)  # 缩放学习率默认为0.005。
