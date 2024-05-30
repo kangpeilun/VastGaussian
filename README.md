@@ -26,7 +26,7 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 - [x] ~~Seamless Merging is implemented~~
 
-- [x] ~~For non-standard scenes by manual Manhattan alignment
+- [x] ~~For non-standard scenes by manual Manhattan alignment~~
 
 - [ ] Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud
 
