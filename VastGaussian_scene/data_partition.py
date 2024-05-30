@@ -38,7 +38,7 @@ class CameraPartition(NamedTuple):
 
 class ProgressiveDataPartitioning:
     # 渐进数据分区
-    def __init__(self, scene_info, train_cameras, model_path, m_region=2, n_region=2, extend_rate=0.2,
+    def __init__(self, scene_info, train_cameras, model_path, m_region=2, n_region=4, extend_rate=0.2,
                  visible_rate=0.25):
         self.partition_scene = None
         self.pcd = scene_info.point_cloud
@@ -91,9 +91,15 @@ class ProgressiveDataPartitioning:
         """
         m, n = self.m_region, self.n_region    # m=2, n=4
         CameraPose_list = []
+        camera_centers = []
         for idx, camera in enumerate(train_cameras):
+            pose = np.array(camera.camera_center.cpu())
+            camera_centers.append(pose)
             CameraPose_list.append(
-                CameraPose(camera=camera, pose=np.array(camera.camera_center.cpu())))  # 世界坐标系下相机的中心坐标
+                CameraPose(camera=camera, pose=pose))  # 世界坐标系下相机的中心坐标
+
+        # 保存相机坐标，用于可视化相机位置
+        storePly(os.path.join(self.partition_dir, 'camera_centers.ply'), np.array(camera_centers), np.zeros_like(np.array(camera_centers)))
 
         # 2.沿着x轴将相机分成m部分
         m_partition_dict = {}

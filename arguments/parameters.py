@@ -55,12 +55,11 @@ def ModelParams(parser):
 
     # 新增的可选参数，用于实验调整参数
     parser.add_argument("--exp_name", type=str, default="building_downsample", help="experiment name, if have the same name dir, mkdir a new one like exp_name_1, exp_name_2 ...")  # 为每次实验命名
-    parser.add_argument("--limited_range", type=float, default=0, help="是否限制致密化生成点云的范围, 这样可以有效显示clone和split后生成点云的数量, 且加快训练速度，"
-                                                                       "但是render的效果很差, 默认为0表示不限制, 0.5表示限制范围为原来的0.5倍, 1.5表示限制范围为原始的1.5倍，以此类推")
-    parser.add_argument("--manhattan", action="store_true") # 是否需要曼哈顿对齐
-    parser.add_argument("--pos", nargs=3, type=float)       # 点云平移
-    parser.add_argument("--rot", nargs=3, type=float)       # 点云平移
-    parser.add_argument("--man_trans", default='')
+    parser.add_argument("--manhattan", action="store_true")   # 是否需要曼哈顿对齐
+    parser.add_argument("--plantform", type=str, default="cloudcompare", choices=["cloudcompare", "threejs"])  # 使用哪种平台进行曼哈顿对齐
+    parser.add_argument("--pos", nargs=3, type=float)         # 点云平移，平移向量
+    parser.add_argument("--rot", nargs=3, type=float)         # 点云平移，如果处理平台为cloudcompare，则rot为旋转矩阵，否则用threejs处理rot就为三个旋转向量
+    parser.add_argument("--man_trans", default=None)  # 指定经过曼哈顿对齐后的点云坐标相对于初始点云坐标的变换矩阵
 
     # man_trans = np.array([[0.999934, 0.003912, 0.010757, -46.085182],
     #                       [0.003630, -0.999651, 0.026173, 5.958979],

@@ -10,6 +10,8 @@
 #
 import glob
 import os
+
+import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
@@ -55,7 +57,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     for partition_id in range(len(big_scene.partition_data)):
         gaussians = GaussianModel(dataset)
-        partition_scene = PartitionScene(dataset, gaussians, partition_id, big_scene.partition_data[partition_id], big_scene.cameras_extent)
+        partition_scene = PartitionScene(dataset, gaussians, partition_id, big_scene.partition_data[partition_id],
+                                         big_scene.cameras_extent)
         gaussians.training_setup(opt)
 
         viewpoint_stack = None
@@ -94,7 +97,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # Ll1 = l1_loss(image, gt_image)
             Ll1 = l1_loss(decouple_image, gt_image)  # 使用外观解耦后的图像与gt计算损失
             loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (
-                        1.0 - ssim(image, gt_image))  # loss = L1_loss + SSIM_loss(图像质量损失)  lambda_dssim控制ssim对总损失的影响，默认为0.2
+                    1.0 - ssim(image, gt_image))  # loss = L1_loss + SSIM_loss(图像质量损失)  lambda_dssim控制ssim对总损失的影响，默认为0.2
             loss.backward()
 
             iter_end.record()
@@ -124,9 +127,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:  # 当迭代次数大于500,并且迭代次数能够整除100时，每隔100个迭代对点云进行优化
                         size_threshold = 20 if iteration > opt.opacity_reset_interval else None
-                        gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, partition_scene.cameras_extent, size_threshold)
+                        gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, partition_scene.cameras_extent,
+                                                    size_threshold)
 
-                    if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
+                    if iteration % opt.opacity_reset_interval == 0 or (
+                            dataset.white_background and iteration == opt.densify_from_iter):
                         gaussians.reset_opacity()
 
                 # Optimizer step
@@ -148,17 +153,17 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     transformation_map = transformation_map.cpu()
                     transformation_map = transforms.ToPILImage()(transformation_map)
-                    transformation_map.save(f"{save_dir}/transformation_map_{partition_id}_{viewpoint_cam.uid}_{iteration}.png")
+                    transformation_map.save(
+                        f"{save_dir}/transformation_map_{partition_id}_{viewpoint_cam.uid}_{iteration}.png")
 
                     image = image.cpu()
                     image = transforms.ToPILImage()(image)
                     image.save(f"{save_dir}/render_image_{partition_id}_{viewpoint_cam.uid}_{iteration}.png")
 
-
                 if (iteration in checkpoint_iterations):
                     print("\n[ITER {}] Saving Checkpoint".format(iteration))
-                    torch.save((gaussians.capture(), iteration), partition_scene.model_path + "/chkpnt" + str(iteration) + ".pth")
-
+                    torch.save((gaussians.capture(), iteration),
+                               partition_scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
     # seamless_merging 无缝合并
     print("Merging Partitions...")
@@ -203,7 +208,8 @@ def prepare_output_and_logger(args):
     return tb_writer
 
 
-def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene: PartitionScene, renderFunc,
+def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene: PartitionScene,
+                    renderFunc,
                     renderArgs):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -215,9 +221,9 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
         torch.cuda.empty_cache()
         validation_configs = [
             # {'name': 'test', 'cameras': scene.getTestCameras()},
-                              {'name': 'train',
-                               'cameras': [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in
-                                           range(5, 30, 5)]}]
+            {'name': 'train',
+             'cameras': [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in
+                         range(5, 30, 5)]}]
 
         for config in validation_configs:
             if config['cameras'] and len(config['cameras']) > 0:
@@ -259,8 +265,26 @@ def train_main():
     op, before_extract_op = extract(lp, OptimizationParams(parser).parse_args())
     pp, before_extract_pp = extract(before_extract_op, PipelineParams(parser).parse_args())
 
-    man_trans = create_man_rans(lp.pos, lp.rot)
-    lp.man_trans = man_trans
+    if lp.plantform == "threejs":  #
+        man_trans = create_man_rans(lp.pos, lp.rot)
+        lp.man_trans = man_trans
+
+    # 使用cloudcompare处理后，将经过多次translate/rotate的得到的多个变换矩阵依次左乘即可得到最终的变换矩阵
+    # A1 = np.array([0.825355350971, 0.036096323282, 0.563458621502, -1.877131938934,
+    #                0.028794845566, 0.993964672089, -0.105854183435, 0.351995319128,
+    #                -0.563878893852, 0.103592015803, 0.819334685802, 0.501181662083,
+    #                0, 0, 0, 1]).reshape([4, 4])
+    # A2 = np.array([0.997768461704, 0.005278629251, -0.066559724510, -5.802182197571,
+    #                0.005290360656, 0.999985992908, 0.000000000000, 4.109899044037,
+    #                0.066558793187, 0.000352124945, 0.997782468796, 0.139409780502,
+    #                0.000000000000, 0.000000000000, 0.000000000000, 1.000000000000]).reshape([4, 4])
+    # man_trans = A2 @ A1
+    elif lp.plantform == "cloudcompare":  # 如果处理平台为cloudcompare，则rot为旋转矩阵
+        man_trans = np.zeros((4, 4))
+        man_trans[:3, :3] = lp.rot.transpose()
+        man_trans[:3, -1] = np.array(lp.pos).transpose()
+        man_trans[3, 3] = 1
+        lp.man_trans = man_trans
 
     # train.py脚本显式参数
     parser.add_argument("--ip", type=str, default='127.0.0.1')  # 启动GUI服务器的IP地址，默认为127.0.0.1。
@@ -296,5 +320,3 @@ def train_main():
 
 if __name__ == "__main__":
     train_main()
-
-
