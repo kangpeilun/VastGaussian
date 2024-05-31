@@ -62,9 +62,19 @@ If you have any experiences and feedback on any code changes, feel free to conta
 > 
 > - `seamless_merging.py` corresponding to the `Seamless Merging` in the paper.
 
-4. I have added a new file `train_vast.py` to modify the process of training VastGaussian, if you want to train the original 3DGS, please use `train.py`
-5. The paper mentioned `Manhattan world alignment, so that the Y-axis of the world coordinate is perpendicular to the ground plane`, I asked the experts to know that this thing can be adjusted manually using `threejs`: https://threejs.org/editor/, after manually adjusting the scene you get the --position and --rotation parameters, just take them as command line arguments and train**
-6. In the process of implementation, I used a small range of data provided by 3DGS for testing. Larger data can not run on the native computer, and a large range of data requires at least **32G video memory** according to the instructions of the paper
+4. I have added a new file `train_vast.py` to modify the process of training VastGaussian, if you want to train the original 3DGS, please use `train.py`.
+5. The paper mentioned `Manhattan world alignment, so that the Y-axis of the world coordinate is perpendicular to the ground plane`, I asked the experts to know that this thing can be adjusted manually using `threejs`: https://threejs.org/editor/, after manually adjusting the scene you get the --position and --rotation parameters, just take them as command line arguments and train.
+
+> - After importing your initial point cloud via File-->Import you can check if your initial point cloud needs to be Manhattan aligned, if it looks like this
+> <img src=image/img_7.png align="center" width=800>
+> -Now you can adjust your point cloud so that the ground is perpendicular to the y-axis and the boundaries are as parallel as possible to the x- and z-axis with the help of the options on the left, but of course you can also use the editing area on the right to directly enter the corresponding values.
+>    <div align="center">
+>        <img src=image/img_8.png align="center" height=400>
+>        <img src=image/img_9.png align="center" width=400>
+>    </div> 
+> - Then you can get the appropriate parameters in the right edit area.
+
+6. In the process of implementation, I used a small range of data provided by 3DGS for testing. Larger data can not run on the native computer, and a large range of data requires at least **32G video memory** according to the instructions of the paper.
 7. In the implementation process, some operations in the paper, the author is not very clear about the details, so some implementation is based on my guess and understanding to complete, so my implementation may have some bugs, and some implementation may be a little stupid in the eyes of the expert, if you find problems in the use of the process, please contact me in time, progress together.
 
 ## Using
