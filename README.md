@@ -89,10 +89,6 @@ python train_vast.py -s datasets/xxx --exp_name test
 # Contributors
 Happily, we now have several contributors working on the project, and we welcome more contributors to join us to improve the project. Thank you all for your work.
 
-<a href="https://github.com/Livioni">
-  <img src="https://avatars.githubusercontent.com/u/52649461?v=4" height="75" width="75"/>
-</a>
-
 <a href="https://github.com/VerseWei">
   <img src="https://avatars.githubusercontent.com/u/102359772?v=4" height="75" width="75"/>
 </a>
