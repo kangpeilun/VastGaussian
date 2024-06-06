@@ -17,7 +17,8 @@ import pickle
 from scene.dataset_readers import CameraInfo, storePly, getNerfppNorm_partition
 from utils.graphics_utils import BasicPointCloud
 from VastGaussian_scene.graham_scan import run_graham_scan
-
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 class CameraPose(NamedTuple):
     camera: CameraInfo
@@ -58,13 +59,43 @@ class ProgressiveDataPartitioning:
         if not os.path.exists(self.partition_extend_dir): os.makedirs(self.partition_extend_dir)  # 创建存放分块后 拓展后 点云的文件夹
         if not os.path.exists(self.partition_visible_dir): os.makedirs(
             self.partition_visible_dir)  # 创建存放分块后 可见性相机选择后 点云的文件夹
-
+        self.fig, self.ax = self.draw_pcd(self.pcd, train_cameras)
         self.run_DataPartition(train_cameras)
 
+    def draw_pcd(self, pcd, train_cameras):        
+        x_coords = pcd.points[:, 0]
+        z_coords = pcd.points[:, 2]
+        fig, ax = plt.subplots()
+        ax.scatter(x_coords, z_coords, c=(pcd.colors), s=1)
+        ax.title.set_text('Plot of 2D Points')
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Z-axis')
+        fig.tight_layout()
+        fig.savefig(os.path.join(self.model_path, 'pcd.png'),dpi=200)
+        x_coords = np.array([cam.camera_center[0].item() for cam in train_cameras])
+        z_coords = np.array([cam.camera_center[2].item() for cam in train_cameras])
+        ax.scatter(x_coords, z_coords, color='red', s=1)
+        fig.savefig(os.path.join(self.model_path, 'camera_on_pcd.png'),dpi=200)
+        return fig, ax
+        
+    def draw_partition(self, partition_list):
+        for partition in partition_list:
+            ori_bbox = partition.ori_camera_bbox
+            extend_bbox = partition.extend_camera_bbox
+            x_min, x_max, z_min, z_max = ori_bbox
+            ex_x_min, ex_x_max, ex_z_min, ex_z_max = extend_bbox
+            rect_ori = patches.Rectangle((x_min, z_min), x_max-x_min, z_max-z_min, linewidth=1, edgecolor='blue', facecolor='none')
+            rect_ext = patches.Rectangle((ex_x_min, ex_z_min), ex_x_max-ex_x_min, ex_z_max-ex_z_min, linewidth=1, edgecolor='y', facecolor='none')
+            self.ax.add_patch(rect_ori)
+            self.ax.add_patch(rect_ext)
+        self.fig.savefig(os.path.join(self.model_path, f'regions.png'),dpi=200)
+        return
+        
     def run_DataPartition(self, train_cameras):
         if not os.path.exists(self.save_partition_data_dir):
             partition_dict = self.Camera_position_based_region_division(train_cameras)
             partition_list = self.Position_based_data_selection(partition_dict)
+            self.draw_partition(partition_list)
             self.partition_scene = self.Visibility_based_camera_selection(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云
             self.save_partition_data()
         else:
@@ -187,9 +218,9 @@ class ProgressiveDataPartitioning:
 
             point_num += points.shape[0]
             point_extend_num += points_extend.shape[0]
-            storePly(os.path.join(self.partition_ori_dir, f"{partition_idx}.ply"), points, colors)  # 分别保存未拓展前 和 拓展后的点云
-            storePly(os.path.join(self.partition_extend_dir, f"{partition_idx}_extend.ply"), points_extend,
-                     colors_extend)
+            # storePly(os.path.join(self.partition_ori_dir, f"{partition_idx}.ply"), points, colors)  # 分别保存未拓展前 和 拓展后的点云
+            # storePly(os.path.join(self.partition_extend_dir, f"{partition_idx}_extend.ply"), points_extend,
+            #          colors_extend)
 
         # 未拓展边界前：根据位置选择后的数据量会比初始的点云数量小很多，因为相机围成的边界会比实际的边界小一些，因此使用这些边界筛点云，点的数量会减少
         # 拓展边界后：因为会有许多重合的点，因此点的数量会增多
@@ -274,7 +305,7 @@ class ProgressiveDataPartitioning:
         # 复制一份新的变量，用于添加可视相机后的每个部分的所有相机
         # 防止相机和点云被重复添加
         add_visible_camera_partition_list = copy.deepcopy(partition_list)
-
+        client = 0
         for idx, partition_i in enumerate(partition_list):  # 第i个partition
             new_points = []  # 提前创建空的数组 用于保存新增的点
             new_colors = []
@@ -346,8 +377,10 @@ class ProgressiveDataPartitioning:
             add_visible_camera_partition_list[idx] = add_visible_camera_partition_list[idx]._replace(
                 point_cloud=BasicPointCloud(points=new_points, colors=new_colors,
                                             normals=new_normals))  # 更新点云，新增的点云有许多重复的点，需要在后面剔除掉
-            storePly(os.path.join(self.partition_visible_dir, f"{partition_id_i}_visible.ply"), new_points,
-                     new_colors)  # 保存可见性选择后每个partition的点云
+            store_path = os.path.join(self.partition_visible_dir, client)
+            if not os.path.exists(store_path): os.makedirs(store_path)
+            storePly(os.path.join(self.partition_visible_dir, client, f"visible.ply"), new_points, new_colors)  # 保存可见性选择后每个partition的点云
+            client += 1
 
         return add_visible_camera_partition_list
 
