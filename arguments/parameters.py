@@ -58,8 +58,8 @@ def ModelParams(parser):
     parser.add_argument("--limited_range", type=float, default=0, help="是否限制致密化生成点云的范围, 这样可以有效显示clone和split后生成点云的数量, 且加快训练速度，"
                                                                        "但是render的效果很差, 默认为0表示不限制, 0.5表示限制范围为原来的0.5倍, 1.5表示限制范围为原始的1.5倍，以此类推")
     parser.add_argument("--manhattan", action="store_true") # 是否需要曼哈顿对齐
-    parser.add_argument("--pos", nargs=3, type=float)       # 点云平移
-    parser.add_argument("--rot", nargs=3, type=float)       # 点云平移
+    parser.add_argument("--pos", nargs=3, type=float, default = (0.0,0.0,0.0))       # 点云平移
+    parser.add_argument("--rot", nargs=3, type=float, default = (0.0,0.0,0.0))       # 点云平移
     parser.add_argument("--man_trans", default='')
 
     # man_trans = np.array([[0.999934, 0.003912, 0.010757, -46.085182],
