@@ -24,6 +24,8 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 - [x] ~~Decoupled Appearance Modeling is implemented~~
 
+- [ ] Fix Decoupled Appearance Modeling that didn't work well
+
 - [x] ~~Seamless Merging is implemented~~
 
 - [x] ~~For non-standard scenes by manual Manhattan alignment~~
