@@ -9,10 +9,12 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
-from scene.cameras import Camera
+from scene.cameras import Camera, SimpleCamera
 import numpy as np
 from utils.general_utils import PILtoTorch
 from utils.graphics_utils import fov2focal
+import os
+from PIL import Image
 
 WARNED = False
 
@@ -53,6 +55,16 @@ def loadCam(args, id, cam_info, resolution_scale):
                   image=gt_image, gt_alpha_mask=loaded_mask,
                   image_name=cam_info.image_name, uid=id, data_device=args.data_device, params=cam_info.params)
 
+def loadCamPartition(args, id, cam_info, image_width, image_height):
+
+    # image_width //= args.resolution
+    # image_height //= args.resolution
+    
+    return SimpleCamera(
+        colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T, 
+        FoVx=cam_info.FovX, FoVy=cam_info.FovY, image_name=cam_info.image_name,
+        uid=id, width=image_width, height=image_height, data_device=args.data_device)
+
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args):
     camera_list = []
@@ -62,6 +74,16 @@ def cameraList_from_camInfos(cam_infos, resolution_scale, args):
 
     return camera_list
 
+def cameraList_from_camInfos_partition(cam_infos, image_width, image_height, args):
+    camera_list = []
+
+    for id, c in enumerate(cam_infos):
+        camera_list.append(loadCamPartition(args, id, c, 
+                                            image_width,
+                                            image_height,
+                                            ))   # 对图片进行缩放操作，scale=1表示没有对图片进行缩放
+
+    return camera_list
 
 def camera_to_JSON(id, camera: Camera):
     Rt = np.zeros((4, 4))  # 将旋转矩阵和平移向量 保存于 变换矩阵 中
