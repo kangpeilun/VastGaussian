@@ -40,11 +40,30 @@ except ImportError:
     TENSORBOARD_FOUND = False
 
 
+def decouple_appearance(image, gaussians, view_idx):
+    appearance_embedding = gaussians.get_apperance_embedding(view_idx)
+    H, W = image.size(1), image.size(2)
+    # down sample the image
+    crop_image_down = torch.nn.functional.interpolate(image[None], size=(H // 32, W // 32), mode="bilinear", align_corners=True)[0]
+
+    crop_image_down = torch.cat([crop_image_down, appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)], dim=0)[None]
+    mapping_image = gaussians.appearance_network(crop_image_down, H, W).squeeze()
+    transformed_image = mapping_image * image
+
+    return transformed_image, mapping_image
+    # if not return_transformed_image:
+    #     return l1_loss(transformed_image, crop_gt_image)
+    # else:
+    #     transformed_image = \
+    #     torch.nn.functional.interpolate(transformed_image, size=(origH, origW), mode="bilinear", align_corners=True)[0]
+    #     return transformed_image
+
+
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     tb_writer = prepare_output_and_logger(dataset)
-    DAModel = DecoupleAppearanceModel().to(dataset.data_device)  # 定义外观解耦模型
+    # DAModel = DecoupleAppearanceModel().to(dataset.data_device)  # 定义外观解耦模型
     big_scene = BigScene(dataset)  # 这段代码整个都是加载数据集，同时包含高斯模型参数的加载
-    DAM_optimizer, DAM_scheduler = DAModel.optimize(DAModel)
+    # DAM_optimizer, DAM_scheduler = DAModel.optimize(DAModel)
     # if checkpoint:
     #     (model_params, first_iter) = torch.load(checkpoint)
     #     gaussians.restore(model_params, opt)
@@ -91,7 +110,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg[
                 "viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
             # 外观解耦模型
-            decouple_image, transformation_map = DAModel(image)
+            # decouple_image, transformation_map = DAModel(image)
+            decouple_image, transformation_map = decouple_appearance(image, gaussians, viewpoint_cam.uid)
             # Loss
             gt_image = viewpoint_cam.original_image.cuda()  # 获取ground truth图像
             # Ll1 = l1_loss(image, gt_image)
@@ -137,12 +157,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.optimizer.step()
                     gaussians.optimizer.zero_grad(set_to_none=True)
 
-                    DAM_optimizer.step()
-                    DAM_scheduler.step()
-                    DAM_optimizer.zero_grad()
+                    # DAM_optimizer.step()
+                    # DAM_scheduler.step()
+                    # DAM_optimizer.zero_grad()
 
                 # 每500轮保存一次中间外观解耦图像
-                if iteration % 100 == 0:
+                if iteration % 10 == 0:
                     decouple_image = decouple_image.cpu()
                     decouple_image = transforms.ToPILImage()(decouple_image)
                     save_dir = os.path.join(partition_scene.model_path, "decouple_images")
@@ -215,11 +235,11 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
     # Report test and samples of training set
     if iteration in testing_iterations:
         torch.cuda.empty_cache()
-        validation_configs = (
+        validation_configs = [
             # {'name': 'test', 'cameras': scene.getTestCameras()},
             {'name': 'train',
              'cameras': [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in
-                         range(5, 30, 5)]})
+                         range(5, 30, 5)]}]
 
         for config in validation_configs:
             if config['cameras'] and len(config['cameras']) > 0:

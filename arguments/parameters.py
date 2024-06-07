@@ -71,7 +71,7 @@ def ModelParams(parser):
 
 def OptimizationParams(parser):
     # 下面是OptimizationParams，使用默认值即可
-    parser.add_argument("--iterations", type=int, default=100)  # 要训练的总迭代数，默认为30_000。
+    parser.add_argument("--iterations", type=int, default=30_000)  # 要训练的总迭代数，默认为30_000。
     parser.add_argument("--feature_lr", type=float, default=0.0025)  # 球面谐波具有学习率，默认为0.0025。
     parser.add_argument("--opacity_lr", type=float, default=0.05)  # 不透明学习率默认为0.05。
     parser.add_argument("--scaling_lr", type=float, default=0.005)  # 缩放学习率默认为0.005。
@@ -87,6 +87,10 @@ def OptimizationParams(parser):
     parser.add_argument("--opacity_reset_interval", type=int, default=3000)  # 重置不透明度的频率，默认为3_000。优化可能会遇到靠近输入摄像头的漂浮物,也就是致密化产生不必要的高斯点，因此将将不透明度设置为0
     parser.add_argument("--lambda_dssim", type=float, default=0.2)  # SSIM对总损失的影响从0到1,0.2默认。
     parser.add_argument("--percent_dense", type=float, default=0.01)  # 一个点必须超过场景范围的百分比(0-1)才能强制致密化，默认为0.01。通过百分比来限制多大的高斯应该被split，多小的高斯应该被clone
+
+    # Appearance Decouple
+    parser.add_argument("--appearance_embeddings_lr", type=float, default=0.001)  # AE的学习率
+    parser.add_argument("--appearance_network_lr", type=float, default=0.001)  # 外观解耦网络的学习率
 
     return parser
 
