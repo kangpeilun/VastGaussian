@@ -14,6 +14,36 @@ from torch import nn
 import numpy as np
 from utils.graphics_utils import getWorld2View2, getProjectionMatrix
 
+class SimpleCamera(nn.Module):
+    def __init__(self, colmap_id, R, T, FoVx, FoVy, image_name, uid, width, height, 
+                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device="cuda"):
+        super(SimpleCamera, self).__init__()
+        self.uid = uid
+        self.colmap_id = colmap_id
+        self.R = R
+        self.T = T
+        self.FoVx = FoVx
+        self.FoVy = FoVy
+        self.image_name = image_name
+        self.image_width = width
+        self.image_height = height
+        try:
+            self.data_device = torch.device(data_device)
+        except Exception as e:
+            print(e)
+            print(f"[Warning] Custom device {data_device} failed, fallback to default cuda device" )
+            self.data_device = torch.device("cuda")
+            
+        self.zfar = 100.0
+        self.znear = 0.01
+        
+        self.trans = trans  # 相机中心的平移
+        self.scale = scale  # 相机中心坐标的缩放
+        self.world_view_transform = torch.tensor(getWorld2View2(R, T, trans, scale)).transpose(0, 1).cuda()  # W2C世界到相机坐标系的变换矩阵，4×4  注意这里使用transpose(0, 1)进行了一下转置
+        self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0, 1).cuda()  # 裁减空间->NDC空间，用于将坐标压缩到0-1之间
+        self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)  # 世界->相机->裁减空间->NDC空间                
+        self.camera_center = self.world_view_transform.inverse()[3, :3]  # 相机中心在世界坐标系下的坐标 world_view_transform进行了一下转置，所以取[3, :3]
+        
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
                  image_name, uid,

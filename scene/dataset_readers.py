@@ -11,8 +11,13 @@
 
 import os
 import sys
+import glob
+import cv2
 from PIL import Image
 from typing import NamedTuple
+
+from colorama import Fore, Style
+from tqdm import tqdm
 from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
     read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
@@ -108,7 +113,7 @@ def getNerfppNorm_partition(cameras):
     return {"translate": translate, "radius": radius}
 
 
-def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
+def readColmapCamerasPartition(cam_extrinsics, cam_intrinsics, images_folder, man_trans):
     cam_infos = []
     for idx, key in enumerate(cam_extrinsics):  # 每个相机单独处理
         sys.stdout.write('\r')
@@ -122,8 +127,81 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         width = intr.width
 
         uid = intr.id  # 获取相机对应id
-        R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
-        T = np.array(extr.tvec)  # 获取该图片的平移向量
+
+        if man_trans is None:
+            R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
+            T = np.array(extr.tvec)  # 获取该图片的平移向量
+        else:
+            R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
+            T = np.array(extr.tvec)  # 获取该图片的平移向量
+
+            W2C = np.zeros((4, 4))
+            W2C[:3, :3] = R.transpose()
+            W2C[:3, -1] = T
+            W2C[3, 3] = 1.0
+            W2nC = W2C @ np.linalg.inv(man_trans)   # 相机跟着点云旋转平移后得到新的相机坐标系nC
+
+            R = W2nC[:3, :3]
+            R = R.transpose()
+            T = W2nC[:3, -1]
+
+        params = np.array(intr.params)
+
+        if intr.model == "SIMPLE_PINHOLE":  # 使用SIMPLE_PINHOLE相机模型，适用于非畸变图像，它有一个焦距参数，也可以理解为fx=fy
+            focal_length_x = intr.params[0]  # 相机内参
+            FovY = focal2fov(focal_length_x, height)
+            FovX = focal2fov(focal_length_x, width)
+        elif intr.model == "PINHOLE":  # 使用PINHOLE相机模型，适用于畸变图像，它有两个焦距参数
+            focal_length_x = intr.params[0]  # 获取x轴焦距
+            focal_length_y = intr.params[1]  # 获取y轴焦距
+            FovY = focal2fov(focal_length_y, height)  # 获取垂直视角场  视场角Fov是指在成像场景中，相机可以接收影像的角度范围，也常被称为视野范围
+            FovX = focal2fov(focal_length_x, width)   # 获取水平视角场
+        else:
+            assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"  # Colmap相机模型未处理：仅支持未失真的数据集（PINHOLE或SIMPLE_PINHOLE相机）！
+
+        image_path = os.path.join(images_folder, os.path.basename(extr.name))  # 获取该图片路径
+        image_name = os.path.basename(image_path).split(".")[0]  # 获取该图片名称
+        image = None #此处不加载
+
+        cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+                              image_path=image_path, image_name=image_name, width=width, height=height, params=params)
+        
+        cam_infos.append(cam_info)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
+    sys.stdout.write('\n')
+    return cam_infos
+
+def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, manhattan, man_trans):
+    cam_infos = []
+    for idx, key in enumerate(cam_extrinsics):  # 每个相机单独处理
+        sys.stdout.write('\r')
+        # the exact output you're looking for:
+        sys.stdout.write("Reading camera {}/{}".format(idx + 1, len(cam_extrinsics)))
+        sys.stdout.flush()
+
+        extr = cam_extrinsics[key]  # 获取该图片的 相机外参，将xys的像素坐标转换为世界坐标，然后找到他们的几何中心
+        intr = cam_intrinsics[extr.camera_id]  # 获取该图片所使用的相机内参
+        height = intr.height  # 获取该图片的宽高
+        width = intr.width
+
+        uid = intr.id  # 获取相机对应id
+
+        if not manhattan:
+            R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
+            T = np.array(extr.tvec)  # 获取该图片的平移向量
+        else:
+            R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
+            T = np.array(extr.tvec)  # 获取该图片的平移向量
+
+            W2C = np.zeros((4, 4))
+            W2C[:3, :3] = R.transpose()
+            W2C[:3, -1] = T
+            W2C[3, 3] = 1.0
+            W2nC = W2C @ np.linalg.inv(man_trans)   # 相机跟着点云旋转平移后得到新的相机坐标系nC
+
+            R = W2nC[:3, :3]
+            R = R.transpose()
+            T = W2nC[:3, -1]
+
         params = np.array(intr.params)
 
         if intr.model == "SIMPLE_PINHOLE":  # 使用SIMPLE_PINHOLE相机模型，适用于非畸变图像，它有一个焦距参数，也可以理解为fx=fy
@@ -149,7 +227,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     return cam_infos
 
 
-def fetchPly(path):
+def fetchPly(path, manhattan, man_trans):
     """这段代码定义了一个名为 fetchPly 的函数，用于读取并解析一个 PLY 文件，并返回一个 BasicPointCloud 对象。
     函数接受一个参数 path，表示 PLY 文件的路径。
     首先，使用 PlyData.read 方法读取指定路径的 PLY 文件，并将结果赋值给 plydata。
@@ -164,6 +242,12 @@ def fetchPly(path):
     plydata = PlyData.read(path)
     vertices = plydata['vertex']  # 提取点云的顶点
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T  # 将x,y,z这三个坐标属性堆叠在一起
+    # print(positions.shape)
+    if manhattan:                                 # 曼哈顿对齐
+        man_trans_R = man_trans[:3, :3]
+        man_trans_T = man_trans[:3, -1]
+        new_positions = np.dot(man_trans_R, positions.transpose()) + np.repeat(man_trans_T, positions.shape[0]).reshape(-1, positions.shape[0])
+        positions = new_positions.transpose()
     colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0  # 将R,G,B三个颜色属性堆叠在一起，并除以255进行归一化
     normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T  # 提取顶点的三个法向量属性，并堆叠在一起
     return BasicPointCloud(points=positions, colors=colors, normals=normals)
@@ -187,7 +271,7 @@ def storePly(path, xyz, rgb):
     ply_data.write(path)
 
 
-def readColmapSceneInfo(path, images, eval, llffhold=8):
+def readColmapSceneInfo(path, images, eval, manhattan, man_trans, llffhold=8):
     # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")   # 相机外参文件
@@ -202,7 +286,7 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
 
     reading_dir = "images" if images == None else images
     cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics,
-                                           images_folder=os.path.join(path, reading_dir))  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
+                                           images_folder=os.path.join(path, reading_dir), manhattan=manhattan, man_trans=man_trans)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
     cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)  # 根据图片名称对 list进行排序
 
     if eval:
@@ -225,16 +309,163 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
             xyz, rgb, _ = read_points3D_text(txt_path)
         storePly(ply_path, xyz, rgb)
     try:
-        pcd = fetchPly(ply_path)  # 得到稀疏点云中，各个3D点的属性信息
+        pcd = fetchPly(ply_path, manhattan, man_trans)  # 得到稀疏点云中，各个3D点的属性信息
+        # print('WXSWXS',pcd)
     except:
         pcd = None
-
+    # print(pcd)
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
                            test_cameras=test_cam_infos,
                            nerf_normalization=nerf_normalization,
                            ply_path=ply_path)  # 保存一个场景的所有参数信息
     return scene_info
+
+def partition(path, images, man_trans):
+    # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
+    try:
+        cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")   # 相机外参文件
+        cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")  # 相机内参文件
+        cam_extrinsics = read_extrinsics_binary(cameras_extrinsic_file)  # 读取相机外参
+        cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)  # 读取相机内参
+    except:
+        cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.txt")
+        cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.txt")
+        cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
+        cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
+
+    reading_dir = "images" if images == None else images
+    cam_infos_unsorted = readColmapCamerasPartition(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics,
+                                           images_folder=reading_dir, man_trans=man_trans)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
+    cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)  # 根据图片名称对 list进行排序
+
+
+    train_cam_infos = cam_infos  # 得到训练图片的相机参数
+    test_cam_infos = []
+
+    nerf_normalization = getNerfppNorm(train_cam_infos)  # 使用找到在世界坐标系下相机的几何中心
+    # 将3D点云数据写入 scene_info中
+    ply_path = os.path.join(path, "sparse/0/points3D.ply")
+    bin_path = os.path.join(path, "sparse/0/points3D.bin")
+    txt_path = os.path.join(path, "sparse/0/points3D.txt")
+    if not os.path.exists(ply_path):
+        print("Converting point3d.bin to .ply, will happen only the first time you open the scene.")  # 将point3d.bin转换为.ply，只会在您第一次打开场景时发生。
+        try:
+            xyz, rgb, _ = read_points3D_binary(bin_path)
+        except:
+            xyz, rgb, _ = read_points3D_text(txt_path)
+        storePly(ply_path, xyz, rgb)
+    pcd = fetchPly(ply_path, manhattan = True, man_trans = man_trans)  # 得到稀疏点云中，各个3D点的属性信息
+    
+    dist_threshold = 99
+    points, colors, normals = pcd.points, pcd.colors, pcd.normals
+    points_threshold = np.percentile(points[:, 1], dist_threshold) # use dist_ratio to exclude outliers
+    
+    colors = colors[points[:, 1] < points_threshold]
+    normals = normals[points[:, 1] < points_threshold]
+    points = points[points[:, 1] < points_threshold]
+    pcd = BasicPointCloud(points=points, colors=colors, normals=normals)
+    
+    # print(pcd)
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=test_cam_infos,
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)  # 保存一个场景的所有参数信息
+    return scene_info
+
+def readCamerasFromCityTransforms(path, transformsfile, white_background, extension=".png", random_background=False, undistorted=False, is_debug=False):
+    cam_infos = []
+    if undistorted:
+        print("Undistortion the images!!!")
+    with open(os.path.join(path, transformsfile)) as json_file:
+        contents = json.load(json_file)
+        try:
+            fovx = contents["camera_angle_x"]
+        except:
+            fovx = None
+
+        frames = contents["frames"]
+        # check if filename already contain postfix
+
+        if frames[0]["file_path"].split('.')[-1] in ['jpg', 'jpeg', 'JPG', 'png']:
+            extension = ""
+        c2ws = np.array([frame["transform_matrix"] for frame in frames])
+        
+        Ts = c2ws[:,:3,3]
+
+        ct = 0
+
+        progress_bar = tqdm(frames, desc="Loading dataset")
+
+        for idx, frame in enumerate(frames):
+            frame_path_list = frame["file_path"].split('/')[2:]
+            cam_name = os.path.join(path, frame_path_list[0], frame_path_list[1], frame_path_list[2] + extension)
+            if not os.path.exists(cam_name):
+                continue
+            # NeRF 'transform_matrix' is a camera-to-world transform
+            c2w = np.array(frame["transform_matrix"])
+            
+            if idx % 10 == 0:
+                progress_bar.set_postfix({"num": Fore.YELLOW+f"{ct}/{len(frames)}"+Style.RESET_ALL})
+                progress_bar.update(10)
+            if idx == len(frames) - 1:
+                progress_bar.close()
+            
+            ct += 1
+            # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
+            c2w[:3, 1:3] *= -1
+
+            # get the world-to-camera transform and set R, T
+            w2c = np.linalg.inv(c2w)
+
+            R = np.transpose(w2c[:3,:3])  # R is stored transposed due to 'glm' in CUDA code
+            T = w2c[:3, 3]
+
+            image_path = os.path.join(path, cam_name)
+            image_name = Path(cam_name).stem
+            image = Image.open(image_path)
+
+            if undistorted:
+                mtx = np.array(
+                    [
+                        [frame["fl_x"], 0, frame["cx"]],
+                        [0, frame["fl_y"], frame["cy"]],
+                        [0, 0, 1.0],
+                    ],
+                    dtype=np.float32,
+                )
+                dist = np.array([frame["k1"], frame["k2"], frame["p1"], frame["p2"], frame["k3"]], dtype=np.float32)
+                im_data = np.array(image.convert("RGB"))
+                arr = cv2.undistort(im_data / 255.0, mtx, dist, None, mtx)
+                image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGB")
+            else:
+                im_data = np.array(image.convert("RGBA"))
+                if random_background:
+                    bg = [np.random.random(),np.random.random(),np.random.random()] 
+                elif white_background:
+                    bg = [1.0, 1.0, 1.0]
+                else:
+                    bg = [0.0, 0.0, 0.0]
+                norm_data = im_data / 255.0
+                arr = norm_data[:,:,:3] * norm_data[:, :, 3:4] + bg * (1 - norm_data[:, :, 3:4])
+                image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGB")
+
+            if fovx is not None:
+                fovy = focal2fov(fov2focal(fovx, image.size[0]), image.size[1])
+                FovY = fovy 
+                FovX = fovx
+            else:
+                # given focal in pixel unit
+                FovY = focal2fov(frame["fl_y"], image.size[1])
+                FovX = focal2fov(frame["fl_x"], image.size[0])
+
+            cam_infos.append(CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+                            image_path=image_path, image_name=image_name, width=image.size[0], height=image.size[1], params=None))
+            
+            if is_debug and idx > 50:
+                break
+    return cam_infos
 
 
 def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png"):
@@ -317,12 +548,45 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
                            ply_path=ply_path)
     return scene_info
 
+def readCityInfo(path, white_background, eval, extension=".png", llffhold=8):
+    print(path)
+    json_path = glob.glob(os.path.join(path, f"*.json"))[0].split('/')[-1]
+    print("Reading Training Transforms from {}".format(json_path))
+    
+    cam_infos = readCamerasFromCityTransforms(path, json_path, white_background, extension)
+    print("Load Cameras: ", len(cam_infos))
+    train_cam_infos = []
+    test_cam_infos = []
+    
+    if not eval:
+        train_cam_infos.extend(cam_infos)
+        test_cam_infos = []
+    else:
+        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
+        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
 
+    nerf_normalization = getNerfppNorm(train_cam_infos)
+
+    ply_path = glob.glob(os.path.join(path, "*.ply"))[0]
+    if os.path.exists(ply_path):
+        try:
+            pcd = fetchPly(ply_path)
+        except:
+            raise ValueError("must have tiepoints!")
+    
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=test_cam_infos,
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)
+    return scene_info
 
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
+    "Partition": partition,
     "Blender": readNerfSyntheticInfo,
+    "City": readCityInfo,
 }
 
 

@@ -447,9 +447,6 @@ class GaussianModel:
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent)  # 高斯点云的尺寸比场景范围小到一定程度的点采用clone
         # torch.max(self.get_scaling, dim=1).values 寻找每个点云在 x y z方向上的长度的最大值作为筛选的标准
-        if self.dataset.limited_range > 0:  # 只有在限制点云的clone区域后才进行区域筛选
-            selected_pts_mask_limited_range = self.densify_and_limited_range(self._xyz)  # 对需要克隆的点进行筛选，确保其范围在场景范围内
-            selected_pts_mask = torch.logical_and(selected_pts_mask, selected_pts_mask_limited_range)  # 将前后两次的筛选结果进行与操作
 
         new_xyz = self._xyz[selected_pts_mask]  # 将筛选出来的点云的坐标复制到新变量，实现对点的克隆
         new_features_dc = self._features_dc[selected_pts_mask]
@@ -468,7 +465,6 @@ class GaussianModel:
 
         self.densify_and_clone(grads, max_grad, extent)
         self.densify_and_split(grads, max_grad, extent)
-        # self.densify_and_limited_range()  # 限制clone和split生成的点云范围，该步骤会迅速增加显存用量，需要查找原因：可能是由于优化器多次cat变量的原因导致后期点云数量迅速增大
 
         prune_mask = (self.get_opacity < min_opacity).squeeze()
         if max_screen_size:
