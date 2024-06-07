@@ -472,83 +472,92 @@ class GaussianModel:
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
 
-    def densify_and_split(self, grads, grad_threshold,  grads_abs, grad_abs_threshold, scene_extent, N=2):
+    def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
-        # Extract points that satisfy the gradient condition
+        # Extract points that satisfy the gradient condition 提取满足梯度条件的点
         padded_grad = torch.zeros((n_init_points), device="cuda")
         padded_grad[:grads.shape[0]] = grads.squeeze()
         selected_pts_mask = torch.where(padded_grad >= grad_threshold, True, False)
-        padded_grad_abs = torch.zeros((n_init_points), device="cuda")
-        padded_grad_abs[:grads_abs.shape[0]] = grads_abs.squeeze()
-        selected_pts_mask_abs = torch.where(padded_grad_abs >= grad_abs_threshold, True, False)
-        selected_pts_mask = torch.logical_or(selected_pts_mask, selected_pts_mask_abs)
         selected_pts_mask = torch.logical_and(selected_pts_mask,
-                                              torch.max(self.get_scaling, dim=1).values > self.percent_dense*scene_extent)
+                                              torch.max(self.get_scaling,
+                                                        dim=1).values > self.percent_dense * scene_extent)  # [23509,] 比场景范围大到一定程度的点采用split，选取出大于阈值的点云
 
-        stds = self.get_scaling[selected_pts_mask].repeat(N,1)
-        means =torch.zeros((stds.size(0), 3),device="cuda")
-        samples = torch.normal(mean=means, std=stds)
-        rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N,1,1)
-        new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
-        new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask].repeat(N,1) / (0.8*N))
-        new_rotation = self._rotation[selected_pts_mask].repeat(N,1)
-        new_features_dc = self._features_dc[selected_pts_mask].repeat(N,1,1)
-        new_features_rest = self._features_rest[selected_pts_mask].repeat(N,1,1)
-        new_opacity = self._opacity[selected_pts_mask].repeat(N,1)
+        stds = self.get_scaling[selected_pts_mask].repeat(N, 1)  # [24, 3]选出这个几个高斯点云对应的标准差，同时复制N份，也就是2份
+        means = torch.zeros((stds.size(0), 3), device="cuda")  # [24, 3] 生成均值，均值为0
+        samples = torch.normal(mean=means, std=stds)  # [24, 3] 使用正态分布复制点云
+        rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)  # [24, 3, 3] 得到筛选出的高斯点云的旋转矩阵3x3
+        new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N,
+                                                                                                              1)  # [24, 3] 先按照split的mask对点云进行分割，然后再限定点云的范围
+        new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask].repeat(N, 1) / (0.8 * N))
+        new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
+        new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
+        new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
+        new_opacity = self._opacity[selected_pts_mask].repeat(N, 1)
+
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation)
 
-        prune_filter = torch.cat((selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
+        prune_filter = torch.cat(
+            (selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))  # 将筛选出来的点的索引和新的点云中的点的索引拼接在一起，用于后续的剪枝操作，因为复制出来的点不用再split，因此用False填充
         self.prune_points(prune_filter)
 
-    def densify_and_clone(self, grads, grad_threshold,  grads_abs, grad_abs_threshold, scene_extent):
-        # Extract points that satisfy the gradient condition
+    def densify_and_clone(self, grads, grad_threshold, scene_extent):
+        # Extract points that satisfy the gradient condition 提取满足梯度条件的点
         selected_pts_mask = torch.where(torch.norm(grads, dim=-1) >= grad_threshold, True, False)
-        selected_pts_mask_abs = torch.where(torch.norm(grads_abs, dim=-1) >= grad_abs_threshold, True, False)
-        selected_pts_mask = torch.logical_or(selected_pts_mask, selected_pts_mask_abs)
         selected_pts_mask = torch.logical_and(selected_pts_mask,
-                                              torch.max(self.get_scaling, dim=1).values <= self.percent_dense*scene_extent)
-        
-        new_xyz = self._xyz[selected_pts_mask]
-        # sample a new gaussian instead of fixing position
-        stds = self.get_scaling[selected_pts_mask]
-        means =torch.zeros((stds.size(0), 3),device="cuda")
-        samples = torch.normal(mean=means, std=stds)
-        rots = build_rotation(self._rotation[selected_pts_mask])
-        new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask]
-        
+                                              torch.max(self.get_scaling,
+                                                        dim=1).values <= self.percent_dense * scene_extent)  # 高斯点云的尺寸比场景范围小到一定程度的点采用clone
+        # torch.max(self.get_scaling, dim=1).values 寻找每个点云在 x y z方向上的长度的最大值作为筛选的标准
+
+        new_xyz = self._xyz[selected_pts_mask]  # 将筛选出来的点云的坐标复制到新变量，实现对点的克隆
         new_features_dc = self._features_dc[selected_pts_mask]
         new_features_rest = self._features_rest[selected_pts_mask]
         new_opacities = self._opacity[selected_pts_mask]
         new_scaling = self._scaling[selected_pts_mask]
         new_rotation = self._rotation[selected_pts_mask]
-        
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation)
+
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
+                                   new_rotation)
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
+        # grads = self.xyz_gradient_accum / self.denom
+        # grads[grads.isnan()] = 0.0
+        #
+        # grads_abs = self.xyz_gradient_accum_abs / self.denom
+        # grads_abs[grads_abs.isnan()] = 0.0
+        # ratio = (torch.norm(grads, dim=-1) >= max_grad).float().mean()
+        # Q = torch.quantile(grads_abs.reshape(-1), 1 - ratio)
+        #
+        # before = self._xyz.shape[0]
+        # self.densify_and_clone(grads, max_grad, grads_abs, Q, extent)
+        # clone = self._xyz.shape[0]
+        #
+        # self.densify_and_split(grads, max_grad, grads_abs, Q, extent)
+        # split = self._xyz.shape[0]
+        #
+        # prune_mask = (self.get_opacity < min_opacity).squeeze()
+        # if max_screen_size:
+        #     big_points_vs = self.max_radii2D > max_screen_size
+        #     big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
+        #     prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
+        # self.prune_points(prune_mask)
+        # prune = self._xyz.shape[0]
+        # torch.cuda.empty_cache()
+        # return clone - before, split - clone, split - prune
+
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
-        
-        grads_abs = self.xyz_gradient_accum_abs / self.denom
-        grads_abs[grads_abs.isnan()] = 0.0
-        ratio = (torch.norm(grads, dim=-1) >= max_grad).float().mean()
-        Q = torch.quantile(grads_abs.reshape(-1), 1 - ratio)
-        
-        before = self._xyz.shape[0]
-        self.densify_and_clone(grads, max_grad, grads_abs, Q, extent)
-        clone = self._xyz.shape[0]
-        
-        self.densify_and_split(grads, max_grad, grads_abs, Q, extent)
-        split = self._xyz.shape[0]
-        
+
+        self.densify_and_clone(grads, max_grad, extent)
+        self.densify_and_split(grads, max_grad, extent)
+
         prune_mask = (self.get_opacity < min_opacity).squeeze()
         if max_screen_size:
             big_points_vs = self.max_radii2D > max_screen_size
             big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
             prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
         self.prune_points(prune_mask)
-        prune = self._xyz.shape[0]
-        # torch.cuda.empty_cache()
-        return clone - before, split - clone, split - prune
+
+        torch.cuda.empty_cache()
 
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)

@@ -303,8 +303,9 @@ def train_main():
     elif lp.plantform == "cloudcompare":  # 如果处理平台为cloudcompare，则rot为旋转矩阵
         rot = np.array(lp.rot).reshape([3, 3])
         man_trans = np.zeros((4, 4))
-        man_trans[:3, :3] = rot.transpose()
-        man_trans[:3, -1] = np.array(lp.pos).transpose()
+        # man_trans[:3, :3] = rot.transpose()
+        man_trans[:3, :3] = rot
+        man_trans[:3, -1] = np.array(lp.pos)
         man_trans[3, 3] = 1
         lp.man_trans = man_trans
 
