@@ -39,7 +39,7 @@ class CameraPartition(NamedTuple):
 
 class ProgressiveDataPartitioning:
     # 渐进数据分区
-    def __init__(self, scene_info, train_cameras, model_path, m_region=1, n_region=1, extend_rate=0.2,
+    def __init__(self, scene_info, train_cameras, model_path, m_region=2, n_region=4, extend_rate=0.2,
                  visible_rate=0.25):
         self.partition_scene = None
         self.pcd = scene_info.point_cloud

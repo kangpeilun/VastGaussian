@@ -8,6 +8,7 @@
 #
 # For inquiries contact  george.drettakis@inria.fr
 #
+import copy
 import glob
 import os
 
@@ -214,7 +215,12 @@ def prepare_output_and_logger(args):
     print("Output folder: {}".format(args.model_path))
     os.makedirs(args.model_path, exist_ok=True)
     with open(os.path.join(args.model_path, "cfg_args"), 'w') as cfg_log_f:
-        cfg_log_f.write(str(Namespace(**vars(args))))
+        var_dict = copy.deepcopy(vars(args))
+        del_var_list = ["manhattan", "man_trans", "pos", "rot"]  # 删除多余的变量，防止无法使用SIBR可视化
+        for del_var in del_var_list:
+            del var_dict[del_var]
+        cfg_log_f.write(str(Namespace(**var_dict)))
+
 
     # Create Tensorboard writer
     tb_writer = None
@@ -303,7 +309,6 @@ def train_main():
     elif lp.plantform == "cloudcompare":  # 如果处理平台为cloudcompare，则rot为旋转矩阵
         rot = np.array(lp.rot).reshape([3, 3])
         man_trans = np.zeros((4, 4))
-        # man_trans[:3, :3] = rot.transpose()
         man_trans[:3, :3] = rot
         man_trans[:3, -1] = np.array(lp.pos)
         man_trans[3, 3] = 1
