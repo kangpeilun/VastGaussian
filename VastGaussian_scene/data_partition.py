@@ -383,10 +383,12 @@ class ProgressiveDataPartitioning:
             add_visible_camera_partition_list[idx] = add_visible_camera_partition_list[idx]._replace(
                 point_cloud=BasicPointCloud(points=new_points, colors=new_colors,
                                             normals=new_normals))  # 更新点云，新增的点云有许多重复的点，需要在后面剔除掉
-            store_path = os.path.join(self.partition_visible_dir, client)
-            if not os.path.exists(store_path): os.makedirs(store_path)
-            storePly(os.path.join(self.partition_visible_dir, client, f"visible.ply"), new_points, new_colors)  # 保存可见性选择后每个partition的点云
-            client += 1
+            # store_path = os.path.join(self.partition_visible_dir, str(client))
+            # if not os.path.exists(store_path): os.makedirs(store_path)
+            # storePly(os.path.join(self.partition_visible_dir, str(client), f"visible.ply"), new_points, new_colors)  # 保存可见性选择后每个partition的点云
+            # client += 1
+            storePly(os.path.join(self.partition_visible_dir, f"{partition_id_i}_visible.ply"), new_points,
+                     new_colors)  # 保存可见性选择后每个partition的点云
 
         return add_visible_camera_partition_list
 

@@ -57,8 +57,8 @@ def ModelParams(parser):
     parser.add_argument("--exp_name", type=str, default="building_downsample", help="experiment name, if have the same name dir, mkdir a new one like exp_name_1, exp_name_2 ...")  # 为每次实验命名
     parser.add_argument("--manhattan", action="store_true")   # 是否需要曼哈顿对齐
     parser.add_argument("--plantform", type=str, default="cloudcompare", choices=["cloudcompare", "threejs"])  # 使用哪种平台进行曼哈顿对齐
-    parser.add_argument("--pos", type=float)         # 点云平移，平移向量，如果使用threejs，则pos和rot的参数个数均为三个，如果使用cloudcompare则，rot为9个数，pos为3个数
-    parser.add_argument("--rot", type=float)         # 点云平移，如果处理平台为cloudcompare，则rot为旋转矩阵，否则用threejs处理rot就为三个旋转向量
+    parser.add_argument("--pos", nargs="+", type=float, default=[0, 0, 0])         # 点云平移，平移向量，如果使用threejs，则pos和rot的参数个数均为三个，如果使用cloudcompare则，rot为9个数，pos为3个数
+    parser.add_argument("--rot", nargs="+", type=float, default=[0, 0, 0])         # 点云平移，如果处理平台为cloudcompare，则rot为旋转矩阵，否则用threejs处理rot就为三个旋转向量
     parser.add_argument("--man_trans", default=None)  # 指定经过曼哈顿对齐后的点云坐标相对于初始点云坐标的变换矩阵
 
     # man_trans = np.array([[0.999934, 0.003912, 0.010757, -46.085182],
