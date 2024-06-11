@@ -103,8 +103,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     for partition_id in range(len(big_scene.partition_data)):
         gaussians = GaussianModel(dataset)
-        partition_scene = PartitionScene(dataset, gaussians, partition_id, big_scene.partition_data[partition_id],
-                                         big_scene.cameras_extent)
+        partition_scene = PartitionScene(dataset, gaussians, partition_id, big_scene.partition_data[partition_id])
         gaussians.training_setup(opt)
 
         viewpoint_stack = None
@@ -146,8 +145,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # 外观解耦模型
             decouple_image, transformation_map = decouple_appearance(image, gaussians, viewpoint_cam.uid)
             # Loss
-            # gt_image = viewpoint_cam.original_image.cuda()  # 获取ground truth图像
-            gt_image = original_image.cuda()  # 获取ground truth图像
+            gt_image = viewpoint_cam.original_image.cuda()  # 获取ground truth图像
             # Ll1 = l1_loss(image, gt_image)
             Ll1 = l1_loss(decouple_image, gt_image)  # 使用外观解耦后的图像与gt计算损失
             loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (
@@ -327,7 +325,7 @@ def train_main():
     op, before_extract_op = extract(lp, OptimizationParams(parser).parse_args())
     pp, before_extract_pp = extract(before_extract_op, PipelineParams(parser).parse_args())
 
-    if lp.manhattan and lp.plantform == "threejs":  #
+    if lp.manhattan and lp.plantform == "threejs":
         man_trans = create_man_rans(lp.pos, lp.rot)
         lp.man_trans = man_trans
 
@@ -360,7 +358,7 @@ def train_main():
     parser.add_argument("--debug_from", type=int, default=-1)  # 调试缓慢。您可以指定一个迭代(从0开始)，之后上述调试变为活动状态。
     parser.add_argument("--detect_anomaly", default=False)  #
     parser.add_argument("--test_iterations", nargs="+", type=int,
-                        default=[10, 100, 7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
+                        default=[10, 100, 1000, 7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
     parser.add_argument("--save_iterations", nargs="+", type=int,
                         default=[100, 7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
     parser.add_argument("--quiet", default=False)  # 标记以省略写入标准输出管道的任何文本。

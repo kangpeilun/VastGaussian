@@ -65,6 +65,7 @@ class BigScene:
 
         self.cameras_extent = scene_info.nerf_normalization["radius"]
 
+
         for resolution_scale in resolution_scales:
             print("Loading Training Cameras")
             # self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale,
@@ -100,9 +101,8 @@ class BigScene:
 class PartitionScene:
     gaussians: GaussianModel
 
-    def __init__(self, args: ModelParams, gaussians: GaussianModel, partition_id, partition_data, cameras_extent,
-                 shuffle=True,
-                 resolution_scales=[1.0]):
+    def __init__(self, args: ModelParams, gaussians: GaussianModel, partition_id, partition_data,
+                 shuffle=True):
         """
         :param path: Path to colmap scene main folder.
         """
@@ -110,12 +110,12 @@ class PartitionScene:
         self.gaussians = gaussians
         self.train_cameras = partition_data[0]
         self.partition_id = partition_id
-        self.cameras_extent = cameras_extent
+        self.cameras_extent = partition_data[2]  # 对每个分块后的区域都分别计算一次cameras_extent
 
         if shuffle:
             random.shuffle(self.train_cameras)  # Multi-res consistent random shuffling
 
-        self.gaussians.create_from_pcd(partition_data[1], cameras_extent)  # 对高斯模型的参数进行初始化, 主要使用3D点的xyz坐标，rgb值进行高斯模型的初始化
+        self.gaussians.create_from_pcd(partition_data[1], self.cameras_extent)  # 对高斯模型的参数进行初始化, 主要使用3D点的xyz坐标，rgb值进行高斯模型的初始化
 
     def save(self, iteration):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))

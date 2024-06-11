@@ -103,7 +103,7 @@ def getNerfppNorm_partition(cameras):
     cam_centers = []
 
     for cam in cameras:
-        cam_centers.append(np.array(cam.camera.camera_center.cpu()))  # 将变换矩阵中的平移向量作为相机的中心，在世界坐标系下相机的中心坐标
+        cam_centers.append(np.array(cam.camera_center.cpu()))  # 将变换矩阵中的平移向量作为相机的中心，在世界坐标系下相机的中心坐标
 
     center, diagonal = get_center_and_diag(cam_centers)
     radius = diagonal * 1.1  # 半径

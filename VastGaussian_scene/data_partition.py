@@ -407,7 +407,7 @@ class ProgressiveDataPartitioning:
             partition_id = partition.partition_id
             point_cloud = partition.point_cloud
             cameras = [CameraPose.camera for CameraPose in partition.cameras]
-            # cameras_extent = getNerfppNorm_partition(cameras)["radius"]
-            format_data.append([cameras, point_cloud])
+            cameras_extent = getNerfppNorm_partition(cameras)["radius"]  # 对每个分块后的区域都分别计算一次cameras_extent
+            format_data.append([cameras, point_cloud, cameras_extent])
 
         return format_data
