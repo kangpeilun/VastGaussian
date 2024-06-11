@@ -24,6 +24,8 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 - [x] ~~Decoupled Appearance Modeling is implemented~~
 
+- [x] ~~Fixed high RAM and VRAM usage issues, it is now possible to train the first few iteration on a 12GB GPU and 32GB of RAM~~
+
 - [x] ~~Fix Decoupled Appearance Modeling that didn't work well~~
 
 - [x] ~~Seamless Merging is implemented~~
