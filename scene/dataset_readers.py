@@ -355,7 +355,7 @@ def partition(path, images, man_trans):
         except:
             xyz, rgb, _ = read_points3D_text(txt_path)
         storePly(ply_path, xyz, rgb)
-    pcd = fetchPly(ply_path, manhattan = True, man_trans = man_trans)  # 得到稀疏点云中，各个3D点的属性信息
+    pcd = fetchPly(ply_path, manhattan=True, man_trans=man_trans)  # 得到稀疏点云中，各个3D点的属性信息
     
     dist_threshold = 99
     points, colors, normals = pcd.points, pcd.colors, pcd.normals

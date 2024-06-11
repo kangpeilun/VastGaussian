@@ -30,8 +30,9 @@ from argparse import ArgumentParser, Namespace
 # from arguments import ModelParams, PipelineParams, OptimizationParams
 from arguments.parameters import ModelParams, PipelineParams, OptimizationParams, extract, create_man_rans
 
-from VastGaussian_scene.decouple_appearance_model import DecoupleAppearanceModel
 from VastGaussian_scene.seamless_merging import seamless_merge
+from utils.general_utils import PILtoTorch
+
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -40,7 +41,9 @@ try:
 except ImportError:
     TENSORBOARD_FOUND = False
 
+WARNED = False
 
+# https://github.com/autonomousvision/gaussian-opacity-fields
 def decouple_appearance(image, gaussians, view_idx):
     appearance_embedding = gaussians.get_apperance_embedding(view_idx)
     H, W = image.size(1), image.size(2)
@@ -52,22 +55,45 @@ def decouple_appearance(image, gaussians, view_idx):
     transformed_image = mapping_image * image
 
     return transformed_image, mapping_image
-    # if not return_transformed_image:
-    #     return l1_loss(transformed_image, crop_gt_image)
-    # else:
-    #     transformed_image = \
-    #     torch.nn.functional.interpolate(transformed_image, size=(origH, origW), mode="bilinear", align_corners=True)[0]
-    #     return transformed_image
+
+
+def load_image_while_training(args, image_path, orig_w, orig_h):
+    """在训练时，每加载一次相机，同时载入对应的图片
+    """
+    resolution_scale = 1.0
+    if args.resolution in [1, 2, 4, 8]:
+        resolution = round(orig_w / (resolution_scale * args.resolution)), round(
+            orig_h / (resolution_scale * args.resolution))  # 计算下采样后，图片的尺寸
+    else:  # should be a type that converts to float 应该是转换为float的类型吗
+        if args.resolution == -1:  # 即使没有设置下采样的倍率，也会自动判断图片的宽度是否大于1600，如果大于，则自动进行下采样，并计算下采样的倍率
+            if orig_w > 1600:
+                global WARNED
+                if not WARNED:
+                    print("[ INFO ] Encountered quite large input images (>1.6K pixels width), rescaling to 1.6K.\n "
+                          "If this is not desired, please explicitly specify '--resolution/-r' as 1")
+                    WARNED = True
+                global_down = orig_w / 1600
+            else:
+                global_down = 1
+        else:
+            global_down = orig_w / args.resolution
+
+        scale = float(global_down) * float(resolution_scale)
+        resolution = (int(orig_w / scale), int(orig_h / scale))
+
+    image = Image.open(image_path)
+    resized_image_rgb = PILtoTorch(image, resolution)  # [C, H, W]
+
+    original_image = resized_image_rgb[:3, ...]
+    height = original_image.size(1)
+    width = original_image.size(2)
+
+    return original_image, height, width
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     tb_writer = prepare_output_and_logger(dataset)
-    # DAModel = DecoupleAppearanceModel().to(dataset.data_device)  # 定义外观解耦模型
     big_scene = BigScene(dataset)  # 这段代码整个都是加载数据集，同时包含高斯模型参数的加载
-    # DAM_optimizer, DAM_scheduler = DAModel.optimize(DAModel)
-    # if checkpoint:
-    #     (model_params, first_iter) = torch.load(checkpoint)
-    #     gaussians.restore(model_params, opt)
 
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
     background = torch.tensor(bg_color, dtype=torch.float32, device=dataset.data_device)
@@ -101,7 +127,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # Pick a random Camera 随机选择一个相机
             if not viewpoint_stack:
                 viewpoint_stack = partition_scene.getTrainCameras().copy()
-            viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack) - 1))  # 从相机列表中随机选择一个相机
+            rand_image_id = randint(0, len(viewpoint_stack) - 1)
+            viewpoint_cam = viewpoint_stack.pop(rand_image_id)  # 从相机列表中随机选择一个相机
+
+            original_image, new_height, new_width = load_image_while_training(dataset, os.path.join(dataset.source_path, "images", viewpoint_cam.image_name+".jpg"),
+                                                       viewpoint_cam.image_width, viewpoint_cam.image_height)
+            viewpoint_cam.image_width = new_width
+            viewpoint_cam.image_height = new_height
+            viewpoint_cam.original_image = original_image
 
             # Render
             if (iteration - 1) == debug_from:
@@ -111,10 +144,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg[
                 "viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
             # 外观解耦模型
-            # decouple_image, transformation_map = DAModel(image)
             decouple_image, transformation_map = decouple_appearance(image, gaussians, viewpoint_cam.uid)
             # Loss
-            gt_image = viewpoint_cam.original_image.cuda()  # 获取ground truth图像
+            # gt_image = viewpoint_cam.original_image.cuda()  # 获取ground truth图像
+            gt_image = original_image.cuda()  # 获取ground truth图像
             # Ll1 = l1_loss(image, gt_image)
             Ll1 = l1_loss(decouple_image, gt_image)  # 使用外观解耦后的图像与gt计算损失
             loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (
@@ -133,7 +166,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     progress_bar.close()
 
                 # Log and save
-                training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end),
+                training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end),
                                 testing_iterations, partition_scene, render, (pipe, background))
                 if (iteration in saving_iterations):
                     print("\n[ITER {}] Saving Gaussians".format(iteration))
@@ -158,9 +191,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.optimizer.step()
                     gaussians.optimizer.zero_grad(set_to_none=True)
 
-                    # DAM_optimizer.step()
-                    # DAM_scheduler.step()
-                    # DAM_optimizer.zero_grad()
 
                 # 每500轮保存一次中间外观解耦图像
                 if iteration % 10 == 0:
@@ -231,7 +261,7 @@ def prepare_output_and_logger(args):
     return tb_writer
 
 
-def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene: PartitionScene, renderFunc,
+def training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene: PartitionScene, renderFunc,
                     renderArgs):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -252,6 +282,16 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                 l1_test = 0.0
                 psnr_test = 0.0
                 for idx, viewpoint in enumerate(config['cameras']):
+                    original_image, new_height, new_width = load_image_while_training(dataset,
+                                                                                      os.path.join(dataset.source_path,
+                                                                                                   "images",
+                                                                                                   viewpoint.image_name + ".jpg"),
+                                                                                      viewpoint.image_width,
+                                                                                      viewpoint.image_height)
+                    viewpoint.image_width = new_width
+                    viewpoint.image_height = new_height
+                    viewpoint.original_image = original_image
+
                     image = torch.clamp(renderFunc(viewpoint, scene.gaussians, *renderArgs)["render"], 0.0, 1.0)
                     gt_image = torch.clamp(viewpoint.original_image.to("cuda"), 0.0, 1.0)
                     if tb_writer and (idx < 5):

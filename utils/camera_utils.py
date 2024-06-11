@@ -74,11 +74,13 @@ def cameraList_from_camInfos(cam_infos, resolution_scale, args):
 
     return camera_list
 
-def cameraList_from_camInfos_partition(cam_infos, image_width, image_height, args):
+def cameraList_from_camInfos_partition(cam_infos, args):
     camera_list = []
 
     for id, c in enumerate(cam_infos):
-        camera_list.append(loadCamPartition(args, id, c, 
+        image_width = c.width
+        image_height = c.height
+        camera_list.append(loadCamPartition(args, id, c,
                                             image_width,
                                             image_height,
                                             ))   # 对图片进行缩放操作，scale=1表示没有对图片进行缩放

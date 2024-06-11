@@ -13,7 +13,7 @@ from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks
 from scene.gaussian_model import GaussianModel
 from arguments import ModelParams
-from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
+from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON, cameraList_from_camInfos_partition
 from VastGaussian_scene.data_partition import ProgressiveDataPartitioning
 
 
@@ -39,7 +39,8 @@ class BigScene:
         self.test_cameras = {}
 
         if os.path.exists(os.path.join(args.source_path, "sparse")):
-            scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval, args.manhattan, args.man_trans)  # 得到一个场景的所有参数信息
+            # scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval, args.manhattan, args.man_trans)   # 得到一个场景的所有参数信息
+            scene_info = sceneLoadTypeCallbacks["Partition"](args.source_path, args.images, args.man_trans)  # 得到一个场景的所有参数信息
         elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
             print("Found transforms_train.json file, assuming Blender data set!")
             scene_info = sceneLoadTypeCallbacks["Blender"](args.source_path, args.white_background, args.eval)
@@ -66,11 +67,12 @@ class BigScene:
 
         for resolution_scale in resolution_scales:
             print("Loading Training Cameras")
-            self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale,
-                                                                            args)
-            print("Loading Test Cameras")
-            self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale,
-                                                                           args)
+            # self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale,
+            #                                                                 args)
+            self.train_cameras[resolution_scale] = cameraList_from_camInfos_partition(scene_info.train_cameras, args)
+            # print("Loading Test Cameras")
+            # self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale,
+            #                                                                args)
 
         DataPartitioning = ProgressiveDataPartitioning(scene_info, self.train_cameras[resolution_scales[0]],
                                                        self.model_path)

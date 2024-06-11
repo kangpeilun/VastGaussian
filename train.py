@@ -27,8 +27,6 @@ from argparse import ArgumentParser, Namespace
 # from arguments import ModelParams, PipelineParams, OptimizationParams
 from arguments.parameters import ModelParams, PipelineParams, OptimizationParams, extract
 
-from VastGaussian_scene.decouple_appearance_model import DecoupleAppearanceModel
-
 
 try:
     from torch.utils.tensorboard import SummaryWriter
