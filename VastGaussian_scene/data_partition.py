@@ -203,18 +203,14 @@ class ProgressiveDataPartitioning:
                                   max_x + self.extend_rate * (max_x - min_x),
                                   min_z - self.extend_rate * (max_z - min_z),
                                   max_z + self.extend_rate * (max_z - min_z)]
-            print(ori_camera_bbox)
-            # print(extend_camera_bbox)
+            print("ori_camera_bbox", ori_camera_bbox, "\textend_camera_bbox", extend_camera_bbox)
             # 获取该部分对应的点云
-            # print('WXS', pcd)
             points, colors, normals = self.extract_point_cloud(pcd, ori_camera_bbox)  # 分别提取原始边界内的点云，和拓展边界后的点云
-            # print('WXS', points)
             points_extend, colors_extend, normals_extend = self.extract_point_cloud(pcd, extend_camera_bbox)
             # 论文中说点云围成的边界框的高度选取为最高点到地平面的距离，但在本实现中，因为不确定地平面位置，(可视化中第平面不用坐标轴xz重合)
             # 因此使用整个点云围成的框作为空域感知的边界框
             partition_list.append(CameraPartition(partition_id=partition_idx, cameras=camera_list,
-                                                  point_cloud=BasicPointCloud(points_extend, colors_extend,
-                                                                              normals_extend),
+                                                  point_cloud=BasicPointCloud(points_extend, colors_extend, normals_extend),
                                                   ori_camera_bbox=ori_camera_bbox,
                                                   extend_camera_bbox=extend_camera_bbox,
                                                   extend_rate=self.extend_rate,
@@ -224,9 +220,9 @@ class ProgressiveDataPartitioning:
 
             point_num += points.shape[0]
             point_extend_num += points_extend.shape[0]
-            # storePly(os.path.join(self.partition_ori_dir, f"{partition_idx}.ply"), points, colors)  # 分别保存未拓展前 和 拓展后的点云
-            # storePly(os.path.join(self.partition_extend_dir, f"{partition_idx}_extend.ply"), points_extend,
-            #          colors_extend)
+            storePly(os.path.join(self.partition_ori_dir, f"{partition_idx}.ply"), points, colors)  # 分别保存未拓展前 和 拓展后的点云
+            storePly(os.path.join(self.partition_extend_dir, f"{partition_idx}_extend.ply"), points_extend,
+                     colors_extend)
 
         # 未拓展边界前：根据位置选择后的数据量会比初始的点云数量小很多，因为相机围成的边界会比实际的边界小一些，因此使用这些边界筛点云，点的数量会减少
         # 拓展边界后：因为会有许多重合的点，因此点的数量会增多
@@ -234,6 +230,7 @@ class ProgressiveDataPartitioning:
               f"Total extend point number: {point_extend_num}\n")
 
         return partition_list
+
 
     def get_8_corner_points(self, bbox):
         """根据点云的边界框，生成8个角点的坐标
@@ -248,7 +245,7 @@ class ProgressiveDataPartitioning:
             "maxx_miny_minz": [x_max, y_min, z_min],  # 5
             "maxx_miny_maxz": [x_max, y_min, z_max],  # 6
             "maxx_maxy_minz": [x_max, y_max, z_min],  # 7
-            "maxx_maxy_maxz": [x_max, y_max, z_max]  # 8
+            "maxx_maxy_maxz": [x_max, y_max, z_max]   # 8
         }
 
     def transformPoint4x4(self, p, matrix):
@@ -284,7 +281,7 @@ class ProgressiveDataPartitioning:
         point_image_x = self.ndc2Pix(p_proj[0, :], W)
         mask_x = (point_image_x >= 0) & (point_image_x <= W)
 
-        point_image_y = self.ndc2Pix(p_proj[1, :], H)
+        point_image_y = self.ndc2Pix(p_proj[2, :], H)  # fix xy to xz
         mask_y = (point_image_y >= 0) & (point_image_y <= H)
         mask = mask_x & mask_y
 
@@ -302,7 +299,7 @@ class ProgressiveDataPartitioning:
         """3.基于可见性的相机选择 和 基于覆盖率的点选择
         思路：引入空域感知的能见度计算
             1.假设当前部分为i，选择j部分中的相机，
-            2.将i部分边界框投影到j中的相机中，得到投影区域的面积（边界框只去地上的部分，并且可以分成拓展前和拓展后两种边界框讨论）
+            2.将i部分边界框投影到j中的相机中，得到投影区域的面积（边界框只取地上的部分，并且可以分成拓展前和拓展后两种边界框讨论）
             3.计算投影区域面积与图像像素面积的比值，作为能见度
             4.将j中能见度大于阈值的相机s加入i中
             5.将j中所有可以投影到相机s的点云加入到i中
@@ -333,17 +330,15 @@ class ProgressiveDataPartitioning:
                 # 依次获取当前partition中每个相机的投影矩阵
                 for cameras_pose in partition_j.cameras:
                     camera = cameras_pose.camera  # 获取当前相机
-                    full_proj_transform = np.array(
-                        camera.full_proj_transform.cpu()).flatten()  # 当前相机 世界->相机->裁减->NDC空间 的投影矩阵
+                    full_proj_transform = np.array(camera.full_proj_transform.cpu()).flatten()  # 当前相机 世界->相机->裁减->NDC空间 的投影矩阵
                     # 将i部分的边界框投影到j的当前相机中
                     proj_8_corner_points = {}
                     for key, point in extent_8_corner_points.items():
-                        p_hom = self.transformPoint4x4(point,
-                                                       full_proj_transform)  # 模仿diff-gaussian-rasterization中 forward.cu中的写法
+                        p_hom = self.transformPoint4x4(point, full_proj_transform)  # 模仿diff-gaussian-rasterization中 forward.cu中的写法
                         p_w = 1.0 / (p_hom[3] + 0.0000001)
                         p_proj = [p_hom[0] * p_w, p_hom[1] * p_w, p_hom[2] * p_w]  # 得到NDC空间坐标
                         point_image = [self.ndc2Pix(p_proj[0], camera.image_width),
-                                       self.ndc2Pix(p_proj[1], camera.image_height)]  # 将8个角点映射到当前相机的图像上
+                                       self.ndc2Pix(p_proj[2], camera.image_height)]  # 将8个角点映射到当前相机的图像上 fix xy to xz
                         proj_8_corner_points[key] = point_image
 
                     # 基于覆盖率的点选择
@@ -356,6 +351,7 @@ class ProgressiveDataPartitioning:
                         updated_points, updated_colors, updated_normals = self.point_in_image(pcd_j, camera.image_width,
                                                                                               camera.image_height,
                                                                                               full_proj_transform)  # 在原始点云上需要新增的点 这一部写的for循环，速度有些慢，用多线程加速
+
                         # 更新i部分的需要新增的点云，因为有许多相机可能会观察到相同的点云，因此需要对点云进行去重
                         new_points.append(updated_points)
                         new_colors.append(updated_colors)
@@ -363,8 +359,16 @@ class ProgressiveDataPartitioning:
 
                     with open(os.path.join(self.model_path, "graham_scan"), 'a') as f:
                         f.write(f"intersection_area:{pkg['intersection_area']} "
-                                f"image_area:{pkg['image_area']} "
-                                f"intersection_rate:{pkg['intersection_rate']}\n")
+                                    f"image_area:{pkg['image_area']} "
+                                    f"intersection_rate:{pkg['intersection_rate']}\n")
+                        
+            camera_centers = []
+            for camera_pose in add_visible_camera_partition_list[idx].cameras:
+                camera_centers.append(camera_pose.pose)
+
+            # 保存相机坐标，用于可视化相机位置
+            storePly(os.path.join(self.partition_visible_dir, f'{partition_id_i}_camera_centers.ply'), np.array(camera_centers),
+                     np.zeros_like(np.array(camera_centers)))
 
             # 点云去重
             point_cloud = add_visible_camera_partition_list[idx].point_cloud
