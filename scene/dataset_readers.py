@@ -170,7 +170,7 @@ def readColmapCamerasPartition(cam_extrinsics, cam_intrinsics, images_folder, ma
     sys.stdout.write('\n')
     return cam_infos
 
-def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, manhattan, man_trans):
+def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, man_trans):
     cam_infos = []
     for idx, key in enumerate(cam_extrinsics):  # 每个相机单独处理
         sys.stdout.write('\r')
@@ -185,7 +185,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, manhattan, 
 
         uid = intr.id  # 获取相机对应id
 
-        if not manhattan:
+        if man_trans is None:
             R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
             T = np.array(extr.tvec)  # 获取该图片的平移向量
         else:
@@ -227,7 +227,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, manhattan, 
     return cam_infos
 
 
-def fetchPly(path, manhattan, man_trans):
+def fetchPly(path, man_trans):
     """这段代码定义了一个名为 fetchPly 的函数，用于读取并解析一个 PLY 文件，并返回一个 BasicPointCloud 对象。
     函数接受一个参数 path，表示 PLY 文件的路径。
     首先，使用 PlyData.read 方法读取指定路径的 PLY 文件，并将结果赋值给 plydata。
@@ -243,7 +243,7 @@ def fetchPly(path, manhattan, man_trans):
     vertices = plydata['vertex']  # 提取点云的顶点
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T  # 将x,y,z这三个坐标属性堆叠在一起
     # print(positions.shape)
-    if manhattan:                                 # 曼哈顿对齐
+    if man_trans is not None:                                 # 曼哈顿对齐
         man_trans_R = man_trans[:3, :3]
         man_trans_T = man_trans[:3, -1]
         new_positions = np.dot(man_trans_R, positions.transpose()) + np.repeat(man_trans_T, positions.shape[0]).reshape(-1, positions.shape[0])
@@ -271,7 +271,7 @@ def storePly(path, xyz, rgb):
     ply_data.write(path)
 
 
-def readColmapSceneInfo(path, images, eval, manhattan, man_trans, llffhold=8):
+def readColmapSceneInfo(path, images, eval, man_trans, llffhold=8):
     # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")   # 相机外参文件
@@ -286,7 +286,7 @@ def readColmapSceneInfo(path, images, eval, manhattan, man_trans, llffhold=8):
 
     reading_dir = "images" if images == None else images
     cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics,
-                                           images_folder=os.path.join(path, reading_dir), manhattan=manhattan, man_trans=man_trans)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
+                                           images_folder=os.path.join(path, reading_dir), man_trans=man_trans)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
     cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)  # 根据图片名称对 list进行排序
 
     if eval:
@@ -309,7 +309,7 @@ def readColmapSceneInfo(path, images, eval, manhattan, man_trans, llffhold=8):
             xyz, rgb, _ = read_points3D_text(txt_path)
         storePly(ply_path, xyz, rgb)
     try:
-        pcd = fetchPly(ply_path, manhattan, man_trans)  # 得到稀疏点云中，各个3D点的属性信息
+        pcd = fetchPly(ply_path, man_trans)  # 得到稀疏点云中，各个3D点的属性信息
         # print('WXSWXS',pcd)
     except:
         pcd = None
@@ -355,7 +355,7 @@ def partition(path, images, man_trans):
         except:
             xyz, rgb, _ = read_points3D_text(txt_path)
         storePly(ply_path, xyz, rgb)
-    pcd = fetchPly(ply_path, manhattan=True, man_trans=man_trans)  # 得到稀疏点云中，各个3D点的属性信息
+    pcd = fetchPly(ply_path, man_trans=man_trans)  # 得到稀疏点云中，各个3D点的属性信息
     
     dist_threshold = 99
     points, colors, normals = pcd.points, pcd.colors, pcd.normals

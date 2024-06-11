@@ -327,7 +327,7 @@ def train_main():
     op, before_extract_op = extract(lp, OptimizationParams(parser).parse_args())
     pp, before_extract_pp = extract(before_extract_op, PipelineParams(parser).parse_args())
 
-    if lp.plantform == "threejs":  #
+    if lp.manhattan and lp.plantform == "threejs":  #
         man_trans = create_man_rans(lp.pos, lp.rot)
         lp.man_trans = man_trans
 
@@ -346,7 +346,7 @@ def train_main():
     #        [-0.50768368, 0.10611482, 0.85498364, 0.51466437],
     #        [0., 0., 0., 1.]])
 
-    elif lp.plantform == "cloudcompare":  # 如果处理平台为cloudcompare，则rot为旋转矩阵
+    elif lp.manhattan and lp.plantform == "cloudcompare":  # 如果处理平台为cloudcompare，则rot为旋转矩阵
         rot = np.array(lp.rot).reshape([3, 3])
         man_trans = np.zeros((4, 4))
         man_trans[:3, :3] = rot
@@ -360,9 +360,9 @@ def train_main():
     parser.add_argument("--debug_from", type=int, default=-1)  # 调试缓慢。您可以指定一个迭代(从0开始)，之后上述调试变为活动状态。
     parser.add_argument("--detect_anomaly", default=False)  #
     parser.add_argument("--test_iterations", nargs="+", type=int,
-                        default=[10, 7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
+                        default=[10, 100, 7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
     parser.add_argument("--save_iterations", nargs="+", type=int,
-                        default=[7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
+                        default=[100, 7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
     parser.add_argument("--quiet", default=False)  # 标记以省略写入标准输出管道的任何文本。
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])  # 空格分隔的迭代，在其中存储稍后继续的检查点，保存在模型目录中。
     parser.add_argument("--start_checkpoint", type=str, default=None)  # 路径保存检查点继续训练。
