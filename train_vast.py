@@ -244,7 +244,8 @@ def prepare_output_and_logger(args):
     os.makedirs(args.model_path, exist_ok=True)
     with open(os.path.join(args.model_path, "cfg_args"), 'w') as cfg_log_f:
         var_dict = copy.deepcopy(vars(args))
-        del_var_list = ["manhattan", "man_trans", "pos", "rot"]  # 删除多余的变量，防止无法使用SIBR可视化
+        del_var_list = ["manhattan", "man_trans", "pos", "rot",
+                        "m_region", "n_region", "extend_rate", "visible_rate"]  # 删除多余的变量，防止无法使用SIBR可视化
         for del_var in del_var_list:
             del var_dict[del_var]
         cfg_log_f.write(str(Namespace(**var_dict)))

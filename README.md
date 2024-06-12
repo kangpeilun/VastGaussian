@@ -154,6 +154,7 @@ python train_vast.py -s datasets/xxx --exp_name test
 1. `Urbanscene3D`: https://github.com/Linxius/UrbanScene3D
 
 2. `Mill-19`: https://opendatalab.com/OpenDataLab/Mill_19/tree/main/raw
+> https://vastgaussian.github.io/ have uploaded the pre-processed data for `Urbanscene3D` and `Mill-19`
 
 3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
 
