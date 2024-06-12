@@ -11,6 +11,8 @@ If you have any experiences and feedback on any code changes, feel free to conta
 > 
 > WeChat: k374774222
 
+<a style="color: yellow">If you want to try the newest function, you can pull the branch of develop. But this branch may have some bugs.</a>
+
 ## ToDo List
 - [x] ~~Camera-position-based region division is implemented~~
 
