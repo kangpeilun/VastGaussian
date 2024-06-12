@@ -55,11 +55,19 @@ def ModelParams(parser):
 
     # 新增的可选参数，用于实验调整参数
     parser.add_argument("--exp_name", type=str, default="building_downsample", help="experiment name, if have the same name dir, mkdir a new one like exp_name_1, exp_name_2 ...")  # 为每次实验命名
+    # Manual Manhattan alignment
     parser.add_argument("--manhattan", action="store_true")   # 是否需要曼哈顿对齐
     parser.add_argument("--plantform", type=str, default="cloudcompare", choices=["cloudcompare", "threejs"])  # 使用哪种平台进行曼哈顿对齐
     parser.add_argument("--pos", nargs="+", type=float, default=[0, 0, 0])         # 点云平移，平移向量，如果使用threejs，则pos和rot的参数个数均为三个，如果使用cloudcompare则，rot为9个数，pos为3个数
     parser.add_argument("--rot", nargs="+", type=float, default=[0, 0, 0])         # 点云平移，如果处理平台为cloudcompare，则rot为旋转矩阵，否则用threejs处理rot就为三个旋转向量
     parser.add_argument("--man_trans", default=None)  # 指定经过曼哈顿对齐后的点云坐标相对于初始点云坐标的变换矩阵
+    # data partition params
+    parser.add_argument("--m_region", type=int, default=3, help="the number of regions in the x direction")  # 划分区域的数量，论文作者提醒虽然论文里写的是8块，但实操时用的是9块
+    parser.add_argument("--n_region", type=int, default=3, help="the number of regions in the z direction")
+    parser.add_argument("--extend_rate", type=float, default=0.2, help="The rate of boundary expansion")
+    parser.add_argument("--visible_rate", type=float, default=0.25, help="Airspace-aware visibility rate")
+
+
 
     # man_trans = np.array([[0.999934, 0.003912, 0.010757, -46.085182],
     #                       [0.003630, -0.999651, 0.026173, 5.958979],

@@ -20,8 +20,7 @@ from VastGaussian_scene.data_partition import ProgressiveDataPartitioning
 class BigScene:
     """加载原始的大场景，用于对场景进行分割"""
 
-    def __init__(self, args: ModelParams, load_iteration=None,
-                 resolution_scales=[1.0]):
+    def __init__(self, args, load_iteration=None, resolution_scales=[1.0]):
         """
         :param path: Path to colmap scene main folder.
         """
@@ -76,7 +75,7 @@ class BigScene:
             #                                                                args)
 
         DataPartitioning = ProgressiveDataPartitioning(scene_info, self.train_cameras[resolution_scales[0]],
-                                                       self.model_path)
+                                                       self.model_path, args.m_region, args.n_region, args.extend_rate, args.visible_rate)
         self.partition_data = DataPartitioning.format_data()  # 数据分区
 
         # if self.loaded_iter:
