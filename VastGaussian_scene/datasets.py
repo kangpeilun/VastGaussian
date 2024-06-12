@@ -100,7 +100,7 @@ class BigScene:
 class PartitionScene:
     gaussians: GaussianModel
 
-    def __init__(self, args: ModelParams, gaussians: GaussianModel, partition_id, partition_data,
+    def __init__(self, args, gaussians: GaussianModel, partition_id, partition_data,
                  shuffle=True):
         """
         :param path: Path to colmap scene main folder.

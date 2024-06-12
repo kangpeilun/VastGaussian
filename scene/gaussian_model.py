@@ -44,7 +44,7 @@ class GaussianModel:
         self.rotation_activation = torch.nn.functional.normalize
 
 
-    def __init__(self, dataset : int):
+    def __init__(self, dataset: int, device_id: int):
         self.active_sh_degree = 0
         self.max_sh_degree = dataset.sh_degree
         self._xyz = torch.empty(0)
@@ -59,12 +59,13 @@ class GaussianModel:
         self.optimizer = None
         self.percent_dense = 0
         self.spatial_lr_scale = 0
+        self.device_id = device_id
         self.setup_functions()
         # appearance network and appearance embedding
-        self.appearance_network = AppearanceNetwork(3+64, 3).cuda()
+        self.appearance_network = AppearanceNetwork(3+64, 3).to(f"cuda:{device_id}")
         
         std = 1e-4
-        self._appearance_embeddings = nn.Parameter(torch.empty(2048, 64).cuda())
+        self._appearance_embeddings = nn.Parameter(torch.empty(2048, 64).to(f"cuda:{device_id}"))
         self._appearance_embeddings.data.normal_(0, std)
 
     def capture(self):
@@ -136,7 +137,7 @@ class GaussianModel:
 
         q = r / norm[:, None]
         
-        R = torch.zeros((q.size(0), 3, 3), device='cuda')
+        R = torch.zeros((q.size(0), 3, 3), device=f"cuda:{self.device_id}")
 
         r = q[:, 0]
         x = q[:, 1]
@@ -156,7 +157,7 @@ class GaussianModel:
         rots = R
         xyz = self.get_xyz
         N = xyz.shape[0]
-        G2W = torch.zeros((N, 4, 4), device='cuda')
+        G2W = torch.zeros((N, 4, 4), device=f"cuda:{self.device_id}")
         G2W[:, :3, :3] = rots # TODO check if we need to transpose here
         G2W[:, :3, 3] = xyz
         G2W[:, 3, 3] = 1.0
@@ -168,7 +169,7 @@ class GaussianModel:
         t = G2V[:, :3, 3]
         
         t2 = torch.bmm(-R.transpose(1, 2), t[..., None])[..., 0]
-        V2G = torch.zeros((N, 4, 4), device='cuda')
+        V2G = torch.zeros((N, 4, 4), device=f"cuda:{self.device_id}")
         V2G[:, :3, :3] = R.transpose(1, 2)
         V2G[:, :3, 3] = t2
         V2G[:, 3, 3] = 1.0
@@ -183,20 +184,20 @@ class GaussianModel:
 
     def create_from_pcd(self, pcd : BasicPointCloud, spatial_lr_scale : float):
         self.spatial_lr_scale = spatial_lr_scale
-        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()
-        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())
-        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
+        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().to(f"cuda:{self.device_id}")
+        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().to(f"cuda:{self.device_id}"))
+        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().to(f"cuda:{self.device_id}")
         features[:, :3, 0 ] = fused_color
         features[:, 3:, 1:] = 0.0
 
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
-        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().to(f"cuda:{self.device_id}")), 0.0000001)
         scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 3)
-        rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
+        rots = torch.zeros((fused_point_cloud.shape[0], 4), device=f"cuda:{self.device_id}")
         rots[:, 0] = 1
 
-        opacities = self.inverse_opacity_activation(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))
+        opacities = self.inverse_opacity_activation(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device=f"cuda:{self.device_id}"))
 
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
         self._features_dc = nn.Parameter(features[:,:,0:1].transpose(1, 2).contiguous().requires_grad_(True))
@@ -204,14 +205,14 @@ class GaussianModel:
         self._scaling = nn.Parameter(scales.requires_grad_(True))
         self._rotation = nn.Parameter(rots.requires_grad_(True))
         self._opacity = nn.Parameter(opacities.requires_grad_(True))
-        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=f"cuda:{self.device_id}")
 
     def training_setup(self, training_args):
         self.percent_dense = training_args.percent_dense
-        self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-        self.xyz_gradient_accum_abs = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-        self.xyz_gradient_accum_abs_max = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-        self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
+        self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
+        self.xyz_gradient_accum_abs = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
+        self.xyz_gradient_accum_abs_max = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
+        self.denom = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
 
         l = [
             {'params': [self._xyz], 'lr': training_args.position_lr_init * self.spatial_lr_scale, "name": "xyz"},
@@ -309,7 +310,7 @@ class GaussianModel:
         # rots = rots[mask]
         
         vertices = M.vertices.T    
-        vertices = torch.from_numpy(vertices).float().cuda().unsqueeze(0).repeat(xyz.shape[0], 1, 1)
+        vertices = torch.from_numpy(vertices).float().to(f"cuda:{self.device_id}").unsqueeze(0).repeat(xyz.shape[0], 1, 1)
         # scale vertices first
         vertices = vertices * scale.unsqueeze(-1)
         vertices = torch.bmm(rots, vertices).squeeze(-1) + xyz.unsqueeze(-1)
@@ -364,12 +365,12 @@ class GaussianModel:
         for idx, attr_name in enumerate(rot_names):
             rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
-        self._xyz = nn.Parameter(torch.tensor(xyz, dtype=torch.float, device="cuda").requires_grad_(True))
-        self._features_dc = nn.Parameter(torch.tensor(features_dc, dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(True))
-        self._features_rest = nn.Parameter(torch.tensor(features_extra, dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(True))
-        self._opacity = nn.Parameter(torch.tensor(opacities, dtype=torch.float, device="cuda").requires_grad_(True))
-        self._scaling = nn.Parameter(torch.tensor(scales, dtype=torch.float, device="cuda").requires_grad_(True))
-        self._rotation = nn.Parameter(torch.tensor(rots, dtype=torch.float, device="cuda").requires_grad_(True))
+        self._xyz = nn.Parameter(torch.tensor(xyz, dtype=torch.float, device=f"cuda:{self.device_id}").requires_grad_(True))
+        self._features_dc = nn.Parameter(torch.tensor(features_dc, dtype=torch.float, device=f"cuda:{self.device_id}").transpose(1, 2).contiguous().requires_grad_(True))
+        self._features_rest = nn.Parameter(torch.tensor(features_extra, dtype=torch.float, device=f"cuda:{self.device_id}").transpose(1, 2).contiguous().requires_grad_(True))
+        self._opacity = nn.Parameter(torch.tensor(opacities, dtype=torch.float, device=f"cuda:{self.device_id}").requires_grad_(True))
+        self._scaling = nn.Parameter(torch.tensor(scales, dtype=torch.float, device=f"cuda:{self.device_id}").requires_grad_(True))
+        self._rotation = nn.Parameter(torch.tensor(rots, dtype=torch.float, device=f"cuda:{self.device_id}").requires_grad_(True))
 
         self.active_sh_degree = self.max_sh_degree
 
@@ -466,16 +467,16 @@ class GaussianModel:
         self._scaling = optimizable_tensors["scaling"]
         self._rotation = optimizable_tensors["rotation"]
         
-        self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-        self.xyz_gradient_accum_abs = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-        self.xyz_gradient_accum_abs_max = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-        self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
+        self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
+        self.xyz_gradient_accum_abs = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
+        self.xyz_gradient_accum_abs_max = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
+        self.denom = torch.zeros((self.get_xyz.shape[0], 1), device=f"cuda:{self.device_id}")
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=f"cuda:{self.device_id}")
 
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
         # Extract points that satisfy the gradient condition 提取满足梯度条件的点
-        padded_grad = torch.zeros((n_init_points), device="cuda")
+        padded_grad = torch.zeros((n_init_points), device=f"cuda:{self.device_id}")
         padded_grad[:grads.shape[0]] = grads.squeeze()
         selected_pts_mask = torch.where(padded_grad >= grad_threshold, True, False)
         selected_pts_mask = torch.logical_and(selected_pts_mask,
@@ -483,7 +484,7 @@ class GaussianModel:
                                                         dim=1).values > self.percent_dense * scene_extent)  # [23509,] 比场景范围大到一定程度的点采用split，选取出大于阈值的点云
 
         stds = self.get_scaling[selected_pts_mask].repeat(N, 1)  # [24, 3]选出这个几个高斯点云对应的标准差，同时复制N份，也就是2份
-        means = torch.zeros((stds.size(0), 3), device="cuda")  # [24, 3] 生成均值，均值为0
+        means = torch.zeros((stds.size(0), 3), device=f"cuda:{self.device_id}")  # [24, 3] 生成均值，均值为0
         samples = torch.normal(mean=means, std=stds)  # [24, 3] 使用正态分布复制点云
         rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)  # [24, 3, 3] 得到筛选出的高斯点云的旋转矩阵3x3
         new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N,
@@ -497,7 +498,7 @@ class GaussianModel:
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation)
 
         prune_filter = torch.cat(
-            (selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))  # 将筛选出来的点的索引和新的点云中的点的索引拼接在一起，用于后续的剪枝操作，因为复制出来的点不用再split，因此用False填充
+            (selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device=f"cuda:{self.device_id}", dtype=bool)))  # 将筛选出来的点的索引和新的点云中的点的索引拼接在一起，用于后续的剪枝操作，因为复制出来的点不用再split，因此用False填充
         self.prune_points(prune_filter)
 
     def densify_and_clone(self, grads, grad_threshold, scene_extent):

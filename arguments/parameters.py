@@ -62,11 +62,12 @@ def ModelParams(parser):
     parser.add_argument("--rot", nargs="+", type=float, default=[0, 0, 0])         # 点云平移，如果处理平台为cloudcompare，则rot为旋转矩阵，否则用threejs处理rot就为三个旋转向量
     parser.add_argument("--man_trans", default=None)  # 指定经过曼哈顿对齐后的点云坐标相对于初始点云坐标的变换矩阵
     # data partition params
-    parser.add_argument("--m_region", type=int, default=3, help="the number of regions in the x direction")  # 划分区域的数量，论文作者提醒虽然论文里写的是8块，但实操时用的是9块
-    parser.add_argument("--n_region", type=int, default=3, help="the number of regions in the z direction")
+    parser.add_argument("--m_region", type=int, default=2, help="the number of regions in the x direction")  # 划分区域的数量，论文作者提醒虽然论文里写的是8块，但实操时用的是9块
+    parser.add_argument("--n_region", type=int, default=4, help="the number of regions in the z direction")
     parser.add_argument("--extend_rate", type=float, default=0.2, help="The rate of boundary expansion")
     parser.add_argument("--visible_rate", type=float, default=0.25, help="Airspace-aware visibility rate")
-
+    # multiple GPUs
+    parser.add_argument("--num_gpus", type=int, default=3)
 
 
     # man_trans = np.array([[0.999934, 0.003912, 0.010757, -46.085182],
