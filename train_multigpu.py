@@ -420,7 +420,7 @@ def train_main():
         processes = []
         for index, device_id in enumerate(range(lp.num_gpus)[:remainder]):
             partition_id = partition_pool[index]
-
+            print(f"train partition {partition_id} on gpu {device_id}")
             p = Process(target=training, name=f"Partition_{partition_id}",
                         args=(lp, op, pp, args.test_iterations, args.save_iterations,
                               args.checkpoint_iterations, args.start_checkpoint, args.debug_from, tb_writer,
