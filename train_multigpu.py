@@ -60,9 +60,11 @@ def decouple_appearance(image, gaussians, view_idx):
     return transformed_image, mapping_image
 
 
-def load_image_while_training(args, image_path, orig_w, orig_h):
+def load_image_while_training(args, image_path):
     """在训练时，每加载一次相机，同时载入对应的图片
     """
+    image = Image.open(image_path)
+    orig_w, orig_h = image.width, image.height
     resolution_scale = 1.0
     if args.resolution in [1, 2, 4, 8]:
         resolution = round(orig_w / (resolution_scale * args.resolution)), round(
@@ -118,11 +120,7 @@ def train_partition(dataset, opt, pipe, iter_start, iter_end, first_iter,
         rand_image_id = randint(0, len(viewpoint_stack) - 1)
         viewpoint_cam = viewpoint_stack.pop(rand_image_id)  # 从相机列表中随机选择一个相机
 
-        original_image, new_height, new_width = load_image_while_training(dataset,
-                                                                          os.path.join(dataset.source_path, "images",
-                                                                                       viewpoint_cam.image_name + ".jpg"),
-                                                                          viewpoint_cam.image_width,
-                                                                          viewpoint_cam.image_height)
+        original_image, new_height, new_width = load_image_while_training(dataset, os.path.join(dataset.source_path, "images", viewpoint_cam.image_name+".jpg"))
         viewpoint_cam.image_width = new_width
         viewpoint_cam.image_height = new_height
         viewpoint_cam.original_image = original_image
@@ -294,9 +292,7 @@ def training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, elapsed, 
                     original_image, new_height, new_width = load_image_while_training(dataset,
                                                                                       os.path.join(dataset.source_path,
                                                                                                    "images",
-                                                                                                   viewpoint.image_name + ".jpg"),
-                                                                                      viewpoint.image_width,
-                                                                                      viewpoint.image_height)
+                                                                                                   viewpoint.image_name + ".jpg"))
                     viewpoint.image_width = new_width
                     viewpoint.image_height = new_height
                     viewpoint.original_image = original_image
@@ -401,6 +397,7 @@ def train_main():
 
         processes = []
         for index, device_id in enumerate(range(lp.num_gpus)):
+            torch.cuda.set_device(device_id)
             partition_id = partition_pool[index]
             print(f"train partition {partition_id} on gpu {device_id}")
             p = Process(target=training, name=f"Partition_{partition_id}",
@@ -421,6 +418,7 @@ def train_main():
 
         processes = []
         for index, device_id in enumerate(range(lp.num_gpus)[:remainder]):
+            torch.cuda.set_device(device_id)
             partition_id = partition_pool[index]
             print(f"train partition {partition_id} on gpu {device_id}")
             p = Process(target=training, name=f"Partition_{partition_id}",

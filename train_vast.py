@@ -48,6 +48,8 @@ def decouple_appearance(image, gaussians, view_idx):
     appearance_embedding = gaussians.get_apperance_embedding(view_idx)
     H, W = image.size(1), image.size(2)
     # down sample the image
+    # print("H", H, "W", W)
+    # print("image", image, image.size())
     crop_image_down = torch.nn.functional.interpolate(image[None], size=(H // 32, W // 32), mode="bilinear", align_corners=True)[0]
 
     crop_image_down = torch.cat([crop_image_down, appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)], dim=0)[None]
@@ -57,9 +59,12 @@ def decouple_appearance(image, gaussians, view_idx):
     return transformed_image, mapping_image
 
 
-def load_image_while_training(args, image_path, orig_w, orig_h):
+def load_image_while_training(args, image_path):
     """在训练时，每加载一次相机，同时载入对应的图片
     """
+    image = Image.open(image_path)
+    orig_w, orig_h = image.width, image.height
+    # print(image_path, orig_w, orig_h)
     resolution_scale = 1.0
     if args.resolution in [1, 2, 4, 8]:
         resolution = round(orig_w / (resolution_scale * args.resolution)), round(
@@ -81,7 +86,6 @@ def load_image_while_training(args, image_path, orig_w, orig_h):
         scale = float(global_down) * float(resolution_scale)
         resolution = (int(orig_w / scale), int(orig_h / scale))
 
-    image = Image.open(image_path)
     resized_image_rgb = PILtoTorch(image, resolution)  # [C, H, W]
 
     original_image = resized_image_rgb[:3, ...]
@@ -129,8 +133,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             rand_image_id = randint(0, len(viewpoint_stack) - 1)
             viewpoint_cam = viewpoint_stack.pop(rand_image_id)  # 从相机列表中随机选择一个相机
 
-            original_image, new_height, new_width = load_image_while_training(dataset, os.path.join(dataset.source_path, "images", viewpoint_cam.image_name+".jpg"),
-                                                       viewpoint_cam.image_width, viewpoint_cam.image_height)
+            original_image, new_height, new_width = load_image_while_training(dataset, os.path.join(dataset.source_path, "images", viewpoint_cam.image_name+".jpg"))
+            # print("image_path: ", os.path.join(dataset.source_path, "images", viewpoint_cam.image_name+".jpg"), new_height, new_width)
             viewpoint_cam.image_width = new_width
             viewpoint_cam.image_height = new_height
             viewpoint_cam.original_image = original_image
@@ -284,9 +288,7 @@ def training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, elapsed, 
                     original_image, new_height, new_width = load_image_while_training(dataset,
                                                                                       os.path.join(dataset.source_path,
                                                                                                    "images",
-                                                                                                   viewpoint.image_name + ".jpg"),
-                                                                                      viewpoint.image_width,
-                                                                                      viewpoint.image_height)
+                                                                                                   viewpoint.image_name + ".jpg"))
                     viewpoint.image_width = new_width
                     viewpoint.image_height = new_height
                     viewpoint.original_image = original_image

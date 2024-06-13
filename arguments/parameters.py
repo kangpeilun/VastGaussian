@@ -47,7 +47,7 @@ def ModelParams(parser):
     parser.add_argument("--eval", type=bool, default=False)  # 添加此标志以使用mipnerf360风格的培训/测试分割进行评估。
     # 指定训练前加载图像的分辨率。如果提供1、2、4或8，分别使用原始、1/2、1/4或1/8分辨率。对于所有其他值，将宽度重新缩放到给定的数字，同时保持图像的长宽。
     # 如果未设置且输入图像宽度超过1.6K像素，则输入将自动重新缩放到此目标。
-    parser.add_argument("--resolution", "-r", type=int, default=-1)  # -1
+    parser.add_argument("--resolution", "-r", type=int, default=4)  # -1
     parser.add_argument("--data_device", type=str,
                         default="cuda")  # 指定源图像数据的位置，默认为cuda，如果在大型/高分辨率数据集上训练，建议使用cpu，将减少VRAM消耗，但会稍微减慢训练速度。
     parser.add_argument("--white_background", "-w", type=bool, default=False)  # 添加此标志以使用白色背景而不是黑色(默认)，例如，用于评估NeRF合成数据集。
@@ -74,7 +74,7 @@ def ModelParams(parser):
 
 def OptimizationParams(parser):
     # 下面是OptimizationParams，使用默认值即可
-    parser.add_argument("--iterations", type=int, default=30_000)  # 要训练的总迭代数，默认为30_000。
+    parser.add_argument("--iterations", type=int, default=10_000)  # 要训练的总迭代数，默认为30_000。
     parser.add_argument("--feature_lr", type=float, default=0.0025)  # 球面谐波具有学习率，默认为0.0025。
     parser.add_argument("--opacity_lr", type=float, default=0.05)  # 不透明学习率默认为0.05。
     parser.add_argument("--scaling_lr", type=float, default=0.005)  # 缩放学习率默认为0.005。
