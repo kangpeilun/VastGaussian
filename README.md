@@ -32,7 +32,7 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 - [x] ~~For non-standard scenes by manual Manhattan alignment~~
 
-- [ ] Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud
+- [ ] ~~Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud~~
 
 - [ ] Experiments are carried out on UrbanScene3D and Mill-19 datasets
 - [ ] Fix bugs, and bugs, and bugs ...

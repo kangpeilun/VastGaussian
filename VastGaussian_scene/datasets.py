@@ -20,8 +20,7 @@ from VastGaussian_scene.data_partition import ProgressiveDataPartitioning
 class BigScene:
     """加载原始的大场景，用于对场景进行分割"""
 
-    def __init__(self, args, load_iteration=None,
-                 resolution_scales=[1.0]):
+    def __init__(self, args, load_iteration=None, resolution_scales=[1.0]):
         """
         :param path: Path to colmap scene main folder.
         """
@@ -101,7 +100,7 @@ class BigScene:
 class PartitionScene:
     gaussians: GaussianModel
 
-    def __init__(self, args: ModelParams, gaussians: GaussianModel, partition_id, partition_data,
+    def __init__(self, args, gaussians: GaussianModel, partition_id, partition_data,
                  shuffle=True):
         """
         :param path: Path to colmap scene main folder.

@@ -44,7 +44,7 @@ class GaussianModel:
         self.rotation_activation = torch.nn.functional.normalize
 
 
-    def __init__(self, dataset : int):
+    def __init__(self, dataset: int):
         self.active_sh_degree = 0
         self.max_sh_degree = dataset.sh_degree
         self._xyz = torch.empty(0)
@@ -61,10 +61,10 @@ class GaussianModel:
         self.spatial_lr_scale = 0
         self.setup_functions()
         # appearance network and appearance embedding
-        self.appearance_network = AppearanceNetwork(3+64, 3).cuda()
+        self.appearance_network = AppearanceNetwork(3+64, 3).to("cuda")
         
         std = 1e-4
-        self._appearance_embeddings = nn.Parameter(torch.empty(2048, 64).cuda())
+        self._appearance_embeddings = nn.Parameter(torch.empty(2048, 64).to("cuda"))
         self._appearance_embeddings.data.normal_(0, std)
 
     def capture(self):
@@ -136,7 +136,7 @@ class GaussianModel:
 
         q = r / norm[:, None]
         
-        R = torch.zeros((q.size(0), 3, 3), device='cuda')
+        R = torch.zeros((q.size(0), 3, 3), device="cuda")
 
         r = q[:, 0]
         x = q[:, 1]
@@ -156,7 +156,7 @@ class GaussianModel:
         rots = R
         xyz = self.get_xyz
         N = xyz.shape[0]
-        G2W = torch.zeros((N, 4, 4), device='cuda')
+        G2W = torch.zeros((N, 4, 4), device="cuda")
         G2W[:, :3, :3] = rots # TODO check if we need to transpose here
         G2W[:, :3, 3] = xyz
         G2W[:, 3, 3] = 1.0
@@ -168,7 +168,7 @@ class GaussianModel:
         t = G2V[:, :3, 3]
         
         t2 = torch.bmm(-R.transpose(1, 2), t[..., None])[..., 0]
-        V2G = torch.zeros((N, 4, 4), device='cuda')
+        V2G = torch.zeros((N, 4, 4), device="cuda")
         V2G[:, :3, :3] = R.transpose(1, 2)
         V2G[:, :3, 3] = t2
         V2G[:, 3, 3] = 1.0
@@ -183,15 +183,15 @@ class GaussianModel:
 
     def create_from_pcd(self, pcd : BasicPointCloud, spatial_lr_scale : float):
         self.spatial_lr_scale = spatial_lr_scale
-        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()
-        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())
-        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
+        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().to("cuda")
+        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().to("cuda"))
+        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().to("cuda")
         features[:, :3, 0 ] = fused_color
         features[:, 3:, 1:] = 0.0
 
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
-        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().to("cuda")), 0.0000001)
         scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 3)
         rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
         rots[:, 0] = 1
@@ -309,7 +309,7 @@ class GaussianModel:
         # rots = rots[mask]
         
         vertices = M.vertices.T    
-        vertices = torch.from_numpy(vertices).float().cuda().unsqueeze(0).repeat(xyz.shape[0], 1, 1)
+        vertices = torch.from_numpy(vertices).float().to("cuda").unsqueeze(0).repeat(xyz.shape[0], 1, 1)
         # scale vertices first
         vertices = vertices * scale.unsqueeze(-1)
         vertices = torch.bmm(rots, vertices).squeeze(-1) + xyz.unsqueeze(-1)
