@@ -191,7 +191,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
                 # 每500轮保存一次中间外观解耦图像
-                if iteration % 10 == 0:
+                if iteration % 1000 == 0:
                     decouple_image = decouple_image.cpu()
                     decouple_image = transforms.ToPILImage()(decouple_image)
                     save_dir = os.path.join(partition_scene.model_path, "decouple_images")
@@ -209,6 +209,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if (iteration in checkpoint_iterations):
                     print("\n[ITER {}] Saving Checkpoint".format(iteration))
                     torch.save((gaussians.capture(), iteration), partition_scene.model_path + "/chkpnt" + str(iteration) + ".pth")
+
+        torch.cuda.empty_cache()
 
 
     # seamless_merging 无缝合并
