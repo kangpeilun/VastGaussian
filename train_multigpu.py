@@ -37,6 +37,8 @@ from utils.general_utils import PILtoTorch
 import multiprocessing as mp
 from multiprocessing import Process
 
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
 try:
     from torch.utils.tensorboard import SummaryWriter
 
