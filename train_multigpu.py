@@ -207,13 +207,15 @@ def train_partition(dataset, opt, pipe, iter_start, iter_end, first_iter,
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, tb_writer, partition_id, partition_data, device_id):
+    torch.cuda.set_device(device_id)
+
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
-    background = torch.tensor(bg_color, dtype=torch.float32, device=f"cuda:{device_id}")
+    background = torch.tensor(bg_color, dtype=torch.float32, device=f"cuda")
 
     iter_start = torch.cuda.Event(enable_timing=True)
     iter_end = torch.cuda.Event(enable_timing=True)
 
-    gaussians = GaussianModel(dataset, device_id)
+    gaussians = GaussianModel(dataset)
     partition_scene = PartitionScene(dataset, gaussians, partition_id, partition_data)
     gaussians.training_setup(opt)
 
