@@ -1,1 +1,0 @@
-Namespace(data_device='cuda', eval=False, exp_name='rubble', images='images', model_path='output/rubble', num_gpus=2, plantform='cloudcompare', resolution=4, sh_degree=3, source_path='output/rubble_colmap', white_background=False)
