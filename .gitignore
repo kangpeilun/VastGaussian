@@ -1,8 +1,10 @@
 *.pyc
-.vscode
 .idea
 datasets
-output
+output/rubble_colmap
+output/rubble/partition_point_cloud/extend
+output/rubble/partition_point_cloud/ori
+output/rubble/partition_data.pkl
 SIBR
 SIBR_viewers
 build

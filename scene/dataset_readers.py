@@ -19,7 +19,7 @@ from typing import NamedTuple
 from colorama import Fore, Style
 from tqdm import tqdm
 from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
-    read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
+    read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text, read_extrinsics_binary_vast, read_intrinsics_binary_vast
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 import numpy as np
 import json
@@ -321,6 +321,42 @@ def readColmapSceneInfo(path, images, eval, man_trans, llffhold=8):
                            ply_path=ply_path)  # 保存一个场景的所有参数信息
     return scene_info
 
+def readColmapSceneInfoVast(path, model_path, partition_id, images, eval, man_trans, llffhold=8):
+    # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
+    client_camera_txt_path = os.path.join(model_path, f"{partition_id}_camera.txt")
+    with open(client_camera_txt_path, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+    lines = [line.strip() for line in lines]    
+    
+    cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
+    cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
+    cam_extrinsics = read_extrinsics_binary_vast(cameras_extrinsic_file, lines)
+    cam_intrinsics = read_intrinsics_binary_vast(cameras_intrinsic_file, lines)
+
+    reading_dir = "images" if images == None else images
+    cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics,
+                                           images_folder=os.path.join(path, reading_dir), man_trans=man_trans)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
+    cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)  # 根据图片名称对 list进行排序
+
+    if eval:
+        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
+        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
+    else:
+        train_cam_infos = cam_infos  # 得到训练图片的相机参数
+        test_cam_infos = []
+
+    nerf_normalization = getNerfppNorm(train_cam_infos)  # 使用找到在世界坐标系下相机的几何中心
+
+    ply_path = os.path.join(model_path, f"{partition_id}_visible.ply")
+    pcd = fetchPly(ply_path, man_trans)  # 得到稀疏点云中，各个3D点的属性信息
+    # print(pcd)
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=test_cam_infos,
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)  # 保存一个场景的所有参数信息
+    return scene_info
+
 def partition(path, images, man_trans):
     # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
     try:
@@ -584,6 +620,7 @@ def readCityInfo(path, white_background, eval, extension=".png", llffhold=8):
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
+    "ColmapVast": readColmapSceneInfoVast,
     "Partition": partition,
     "Blender": readNerfSyntheticInfo,
     "City": readCityInfo,
