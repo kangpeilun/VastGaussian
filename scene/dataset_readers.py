@@ -321,19 +321,9 @@ def readColmapSceneInfo(path, images, eval, man_trans, llffhold=8):
                            ply_path=ply_path)  # 保存一个场景的所有参数信息
     return scene_info
 
-def readColmapSceneInfoVast(path, client_path, images, eval, man_trans, llffhold=8):
-    client_index_to_name = {0:"output/rubble/partition_point_cloud/visible/1_1_visible.ply",
-                            1:"output/rubble/partition_point_cloud/visible/1_2_visible.ply",
-                            2:"output/rubble/partition_point_cloud/visible/1_3_visible.ply",
-                            3:"output/rubble/partition_point_cloud/visible/2_1_visible.ply",
-                            4:"output/rubble/partition_point_cloud/visible/2_2_visible.ply",
-                            5:"output/rubble/partition_point_cloud/visible/2_3_visible.ply",
-                            6:"output/rubble/partition_point_cloud/visible/3_1_visible.ply",
-                            7:"output/rubble/partition_point_cloud/visible/3_2_visible.ply",
-                            8:"output/rubble/partition_point_cloud/visible/3_3_visible.ply",
-                            }
+def readColmapSceneInfoVast(path, model_path, partition_id, images, eval, man_trans, llffhold=8):
     # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
-    client_camera_txt_path = os.path.join(client_path, "camera.txt")
+    client_camera_txt_path = os.path.join(model_path, f"{partition_id}_camera.txt")
     with open(client_camera_txt_path, 'r', encoding='utf-8') as file:
         lines = file.readlines()
     lines = [line.strip() for line in lines]    
@@ -357,8 +347,7 @@ def readColmapSceneInfoVast(path, client_path, images, eval, man_trans, llffhold
 
     nerf_normalization = getNerfppNorm(train_cam_infos)  # 使用找到在世界坐标系下相机的几何中心
 
-    client_idx = int(client_path.split('/')[-1])
-    ply_path = client_index_to_name[client_idx]
+    ply_path = os.path.join(model_path, f"{partition_id}_visible.ply")
     pcd = fetchPly(ply_path, man_trans)  # 得到稀疏点云中，各个3D点的属性信息
     # print(pcd)
     scene_info = SceneInfo(point_cloud=pcd,

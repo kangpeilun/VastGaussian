@@ -36,6 +36,11 @@ from utils.general_utils import PILtoTorch
 from multiprocessing import Process
 import torch.multiprocessing as mp
 
+from scene.dataset_readers import sceneLoadTypeCallbacks
+from VastGaussian_scene.data_partition import ProgressiveDataPartitioning
+from utils.camera_utils import cameraList_from_camInfos_partition
+
+
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 try:
@@ -128,7 +133,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 progress_bar.close()
 
             # Log and save
-            training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background), logger = logger)
+            training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background), logger=logger)
             if (iteration in saving_iterations):
                 if logger is not None:
                     logger.info(f"Saving Gaussians at iteration {iteration}")
@@ -160,18 +165,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
 
-def parallel_local_training(gpu_id, client_index, lp_args, op_args, pp_args, test_iterations, save_iterations, checkpoint_iterations,
+def parallel_local_training(gpu_id, partition_id, lp_args, op_args, pp_args, test_iterations, save_iterations, checkpoint_iterations,
                             start_checkpoint, debug_from):
     torch.cuda.set_device(gpu_id)
     
-    model_path = lp_args.model_path
-    client_model_path = f"{model_path}/{client_index:05d}"
-    lp_args.model_path = client_model_path
+    partition_model_path = f"{lp_args.model_path}/partition_point_cloud/visible"
+    lp_args.partition_id = partition_id
+    lp_args.partition_model_path = partition_model_path
 
-    logger = setup_logging(client_index, file_path=client_model_path)
+    logger = setup_logging(partition_id, file_path=partition_model_path)
     # 启动训练
     logger.info("Starting process")
-    training(lp_args, op_args, pp_args, test_iterations, save_iterations, checkpoint_iterations,start_checkpoint, debug_from, logger = logger)
+    training(lp_args, op_args, pp_args, test_iterations, save_iterations, checkpoint_iterations,start_checkpoint, debug_from, logger=logger)
     logger.info("Finishing process")
 
 def setup_logging(process_id, file_path):
@@ -194,24 +199,26 @@ def setup_logging(process_id, file_path):
     return logger
 
 def prepare_output_and_logger(args):
+    # if not args.model_path:
+    #     if os.getenv('OAR_JOB_ID'):
+    #         unique_str = os.getenv('OAR_JOB_ID')
+    #     else:
+    #         unique_str = str(uuid.uuid4())
+    #     args.model_path = os.path.join("./output/", unique_str[0:10])
     if not args.model_path:
-        if os.getenv('OAR_JOB_ID'):
-            unique_str = os.getenv('OAR_JOB_ID')
-        else:
-            unique_str = str(uuid.uuid4())
-        args.model_path = os.path.join("./output/", unique_str[0:10])
+        model_path = os.path.join("./output/", args.exp_name)
+        # 如果这个文件存在，就在这个文件名的基础上创建新的文件夹，文件名后面跟上1,2,3
+        if os.path.exists(model_path):
+            base_name = os.path.basename(model_path)
+            dir_name = os.path.dirname(model_path)
+            file_name, file_ext = os.path.splitext(base_name)
+            counter = 1
+            while os.path.exists(os.path.join(dir_name, f"{file_name}_{counter}{file_ext}")):
+                counter += 1
+            new_folder_name = f"{file_name}_{counter}{file_ext}"
+            model_path = os.path.join(dir_name, new_folder_name)
+        args.model_path = model_path
 
-    # model_path = os.path.join("./output/", args.exp_name)
-    # 如果这个文件存在，就在这个文件名的基础上创建新的文件夹，文件名后面跟上1,2,3
-    # if os.path.exists(model_path):
-    #     base_name = os.path.basename(model_path)
-    #     dir_name = os.path.dirname(model_path)
-    #     file_name, file_ext = os.path.splitext(base_name)
-    #     counter = 1
-    #     while os.path.exists(os.path.join(dir_name, f"{file_name}_{counter}{file_ext}")):
-    #         counter += 1
-    #     new_folder_name = f"{file_name}_{counter}{file_ext}"
-    #     model_path = os.path.join(dir_name, new_folder_name)
     # Set up output folder
     print("Output folder: {}".format(args.model_path))
     os.makedirs(args.model_path, exist_ok=True)
@@ -262,8 +269,7 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                 l1_test /= len(config['cameras'])          
                 if logger is not None:
                     logger.info("[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))   
-                else:
-                    print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
+                print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
                 if tb_writer:
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
@@ -286,8 +292,16 @@ def train_main():
     op, before_extract_op = extract(lp, OptimizationParams(parser).parse_args())
     pp, before_extract_pp = extract(before_extract_op, PipelineParams(parser).parse_args())
 
-    man_trans = create_man_rans(lp.pos, lp.rot)
-    lp.man_trans = man_trans
+    if lp.manhattan and lp.plantform == "threejs":
+        man_trans = create_man_rans(lp.pos, lp.rot)
+        lp.man_trans = man_trans
+    elif lp.manhattan and lp.plantform == "cloudcompare":  # 如果处理平台为cloudcompare，则rot为旋转矩阵
+        rot = np.array(lp.rot).reshape([3, 3])
+        man_trans = np.zeros((4, 4))
+        man_trans[:3, :3] = rot
+        man_trans[:3, -1] = np.array(lp.pos)
+        man_trans[3, 3] = 1
+        lp.man_trans = man_trans
 
     # train.py脚本显式参数
     parser.add_argument("--ip", type=str, default='127.0.0.1')  # 启动GUI服务器的IP地址，默认为127.0.0.1。
@@ -295,9 +309,9 @@ def train_main():
     parser.add_argument("--debug_from", type=int, default=-1)  # 调试缓慢。您可以指定一个迭代(从0开始)，之后上述调试变为活动状态。
     parser.add_argument("--detect_anomaly", default=False)  #
     parser.add_argument("--test_iterations", nargs="+", type=int,
-                        default=[10, 100, 1000, 7_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
+                        default=[100, 1000, 7_000, 10_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
     parser.add_argument("--save_iterations", nargs="+", type=int,
-                        default=[100, 7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
+                        default=[7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
     parser.add_argument("--quiet", default=False)  # 标记以省略写入标准输出管道的任何文本。
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])  # 空格分隔的迭代，在其中存储稍后继续的检查点，保存在模型目录中。
     parser.add_argument("--start_checkpoint", type=str, default=None)  # 路径保存检查点继续训练。
@@ -318,24 +332,44 @@ def train_main():
     mp.set_start_method('spawn', force=True)
 
     tb_writer = prepare_output_and_logger(lp)
-    cuda_devices = torch.cuda.device_count()
-    # big_scene = BigScene(lp)  # 这段代码整个都是加载数据集，同时包含高斯模型参数的加载
-    # training_round = len(big_scene.partition_data) // lp.num_gpus
-    # remainder = len(big_scene.partition_data) % lp.num_gpus  # 判断分块数是否可以被GPU均分，如果不可以均分则需要单独处理
-        # Main Loops
-    training_round = 6
+
+    # 1.对大场景进行分块
+    scene_info = sceneLoadTypeCallbacks["Partition"](lp.source_path, lp.images, lp.man_trans)  # 得到一个场景的所有参数信息
+    train_cameras = cameraList_from_camInfos_partition(scene_info.train_cameras, args=lp)
+    DataPartitioning = ProgressiveDataPartitioning(scene_info, train_cameras, lp.model_path,
+                                                   lp.m_region, lp.n_region, lp.extend_rate, lp.visible_rate)
+    partition_result = DataPartitioning.partition_scene
+    # 保存每个partition的图片名称到txt文件
+    client = 0
+    partition_id_list = []
+    for partition in partition_result:
+        partition_id_list.append(partition.partition_id)
+        camera_info = partition.cameras
+        image_name_list = [camera_info[i].camera.image_name + '.jpg' for i in range(len(camera_info))]
+        txt_file = f"{lp.model_path}/partition_point_cloud/visible/{partition.partition_id}_camera.txt"
+        # 打开一个文件用于写入，如果文件不存在则会被创建
+        with open(txt_file, 'w') as file:
+            # 遍历列表中的每个元素
+            for item in image_name_list:
+                # 将每个元素写入文件，每个元素占一行
+                file.write(f"{item}\n")
+        client += 1
+    del partition_result  # 释放内存
+
+    training_round = client // lp.num_gpus
+    remainder = client % lp.num_gpus  # 判断分块数是否可以被GPU均分，如果不可以均分则需要单独处理
+
+    # Main Loops
     for i in range(training_round):
-        client_pool = [i + training_round * j for j in range(cuda_devices)]
-        
-        # Debug
-        # parallel_local_training(0, 0, lp, op, pp,args.test_iterations, args.save_iterations,
-        #                         args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
-        
+        partition_pool = [i + training_round * j for j in range(lp.num_gpus)]
+
         processes = []
-        for index, device_id in enumerate(range(cuda_devices)):
-            client_index = client_pool[index]
-            p = Process(target=parallel_local_training, name = f"Client_{client_index}",
-                    args=(device_id, client_index, lp, op, pp,
+        for index, device_id in enumerate(range(lp.num_gpus)):
+            partition_index = partition_pool[index]
+            partition_id = partition_id_list[partition_index]
+            print("train partition {} on gpu {}".format(partition_id, device_id))
+            p = Process(target=parallel_local_training, name=f"Partition_{partition_id}",
+                    args=(device_id, partition_id, lp, op, pp,
                           args.test_iterations, args.save_iterations, args.checkpoint_iterations,
                           args.start_checkpoint, args.debug_from))
             processes.append(p)
@@ -343,13 +377,41 @@ def train_main():
         
         for p in processes:
             p.join()  # 等待所有进程完成
-            processes = []
+            # processes = []
             
         torch.cuda.empty_cache()
-        print("###############################################")
-    
+
+    if remainder != 0:
+        partition_pool = [lp.num_gpus*training_round + i for i in range(remainder)]
+        processes = []
+        for index, device_id in enumerate(range(lp.num_gpus)[:remainder]):
+            # torch.cuda.set_device(device_id)
+            partition_index = partition_pool[index]
+            partition_id = partition_id_list[partition_index]
+            print("train partition {} on gpu {}".format(partition_id, device_id))
+            print(f"train partition {partition_id} on gpu {device_id}")
+            p = Process(target=parallel_local_training, name=f"Partition_{partition_id}",
+                        args=(device_id, partition_id, lp, op, pp,
+                              args.test_iterations, args.save_iterations, args.checkpoint_iterations,
+                              args.start_checkpoint, args.debug_from))
+            processes.append(p)
+            p.start()
+
+        for p in processes:
+            p.join()
+
+        torch.cuda.empty_cache()
 
     print("\nTraining complete.")
+
+    # seamless_merging 无缝合并
+    print("Merging Partitions...")
+    all_point_cloud_dir = glob.glob(os.path.join(lp.model_path, "point_cloud", "*"))
+
+    for point_cloud_dir in all_point_cloud_dir:
+        seamless_merge(lp.model_path, point_cloud_dir)
+
+    print("Done!")
 
 
 
