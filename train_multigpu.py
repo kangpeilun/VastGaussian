@@ -440,7 +440,7 @@ def train_main():
     for point_cloud_dir in all_point_cloud_dir:
         seamless_merge(lp.model_path, point_cloud_dir)
 
-    print("Done!")
+    print("All Done!")
 
 
 
