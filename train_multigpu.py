@@ -13,26 +13,22 @@ import glob
 import os
 import logging
 import numpy as np
-import pylab as p
 import torch
-from PIL import Image
 from torchvision import transforms
 from random import randint
 from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
 import sys
 # from scene import Scene, GaussianModel
-from VastGaussian_scene.datasets import BigScene, PartitionScene, GaussianModel
+from VastGaussian_scene.datasets import PartitionScene, GaussianModel
 from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
 from argparse import ArgumentParser, Namespace
-# from arguments import ModelParams, PipelineParams, OptimizationParams
 from arguments.parameters import ModelParams, PipelineParams, OptimizationParams, extract, create_man_rans
 
 from VastGaussian_scene.seamless_merging import seamless_merge
-from utils.general_utils import PILtoTorch
 from multiprocessing import Process
 import torch.multiprocessing as mp
 
@@ -51,6 +47,20 @@ except ImportError:
     TENSORBOARD_FOUND = False
 
 WARNED = False
+
+
+# https://github.com/autonomousvision/gaussian-opacity-fields
+def decouple_appearance(image, gaussians, view_idx):
+    appearance_embedding = gaussians.get_apperance_embedding(view_idx)
+    H, W = image.size(1), image.size(2)
+    # down sample the image
+    crop_image_down = torch.nn.functional.interpolate(image[None], size=(H // 32, W // 32), mode="bilinear", align_corners=True)[0]
+
+    crop_image_down = torch.cat([crop_image_down, appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)], dim=0)[None]
+    mapping_image = gaussians.appearance_network(crop_image_down, H, W).squeeze()
+    transformed_image = mapping_image * image
+
+    return transformed_image, mapping_image
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, logger = None):
@@ -112,12 +122,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()
-        
+
+        # 外观解耦模型
+        decouple_image, transformation_map = decouple_appearance(image, gaussians, viewpoint_cam.uid)
+
         # if viewpoint_cam.is_val: # remove right-side pixels
         #     gt_image = gt_image[..., :gt_image.shape[-1]//2]
         #     image = image[..., :image.shape[-1]//2]
         
-        Ll1 = l1_loss(image, gt_image)
+        Ll1 = l1_loss(decouple_image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
         loss.backward()
 
@@ -164,6 +177,22 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
+            # 每1000轮保存一次中间外观解耦图像
+            if iteration % 1000 == 0:
+                decouple_image = decouple_image.cpu()
+                decouple_image = transforms.ToPILImage()(decouple_image)
+                save_dir = os.path.join(scene.model_path, "decouple_images")
+                if not os.path.exists(save_dir): os.makedirs(save_dir)
+                decouple_image.save(f"{save_dir}/decouple_image_{dataset.partition_id}_{viewpoint_cam.uid}_{iteration}.png")
+
+                transformation_map = transformation_map.cpu()
+                transformation_map = transforms.ToPILImage()(transformation_map)
+                transformation_map.save(
+                    f"{save_dir}/transformation_map_{dataset.partition_id}_{viewpoint_cam.uid}_{iteration}.png")
+
+                image = image.cpu()
+                image = transforms.ToPILImage()(image)
+                image.save(f"{save_dir}/render_image_{dataset.partition_id}_{viewpoint_cam.uid}_{iteration}.png")
 
 def parallel_local_training(gpu_id, partition_id, lp_args, op_args, pp_args, test_iterations, save_iterations, checkpoint_iterations,
                             start_checkpoint, debug_from):

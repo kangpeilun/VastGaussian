@@ -30,7 +30,9 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 - [x] ~~For non-standard scenes by manual Manhattan alignment~~
 
-- [x] ~~Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud~~
+- [x] ~~Parallel training of $m\times n$ regions on a single GPU is implemented after dividing the point cloud~~ Thanks [livion](https://github.com/Livioni) a lot.
+
+- [ ] Refine Seamless Merging
 
 - [ ] Experiments are carried out on UrbanScene3D and Mill-19 datasets
 - [ ] Fix bugs, and bugs, and bugs ...
