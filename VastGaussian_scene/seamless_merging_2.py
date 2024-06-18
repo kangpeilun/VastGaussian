@@ -1,19 +1,20 @@
-# Author: Peilun Kang
-# Contact: kangpeilun@nefu.edu.cn
-# License: Apache Licence
-# Project: VastGaussian
-# File: seamless_merging.py
-# Time: 5/15/24 2:31 PM
-# Des: 无缝合并
+# -*- coding: utf-8 -*-
+#        Data: 2024-06-17 13:20
+#     Project: VastGaussian
+#   File Name: seamless_merging_2.py
+#      Author: KangPeilun
+#       Email: 374774222@qq.com 
+# Description:
 import os.path
-import pickle
+import json
 import numpy as np
 from glob import glob
 
 import torch
 from plyfile import PlyData, PlyElement
-
-from scene.dataset_readers import fetchPly, storePly
+from scene.gaussian_model import GaussianModel
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 
 def load_ply(path):
@@ -101,16 +102,16 @@ def extract_point_cloud(points, bbox):
     return mask
 
 
-def seamless_merge(model_path, partition_point_cloud_dir):
-    save_merge_dir = os.path.join(partition_point_cloud_dir, "point_cloud.ply")
-
+def seamless_merge(model_path, iteration, block_config, save_merge_dir):
+    local_index = os.listdir(model_path)
+    local_model_ply_path = [os.path.join(model_path, i, 'point_cloud', f'iteration_{iteration}', 'point_cloud.ply') for
+                            i in local_index]
+    local_model_ply_path = sorted(local_model_ply_path)
     # 加载partition数据
-    with open(os.path.join(model_path, "partition_data.pkl"), "rb") as f:
-        partition_scene = pickle.load(f)
+    with open(block_config, 'r') as file:
+        block_config_data = json.load(file)
 
-    all_partition_point_cloud = sorted(glob(os.path.join(partition_point_cloud_dir, "*.ply")),
-                                       key=lambda x: os.path.split(x)[-1].split(".")[0].rsplit("_", 1)[
-                                           1])  # 获取所有ply文件的路径
+    record_region = block_config_data['record_region']
 
     # 遍历所有partition点云
     xyz_list = []
@@ -119,14 +120,28 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     opacities_list = []
     scales_list = []
     rots_list = []
-    for partition, point_cloud_path in zip(partition_scene, all_partition_point_cloud):
+
+    for point_cloud_path, region in zip(local_model_ply_path, record_region):
+        client = point_cloud_path.split('/')[-4]
         xyz, features_dc, features_extra, opacities, scales, rots = load_ply(point_cloud_path)
-        extend_camera_bbox = partition.extend_camera_bbox  # 原始相机包围盒
-        extend_point_bbox = partition.extend_point_bbox  # 原始点云包围盒
-        point_select_bbox = [extend_camera_bbox[0], extend_camera_bbox[1],  # [x_min, x_max, y_min, y_max, z_min, z_max]
-                             extend_point_bbox[2], extend_point_bbox[3],
+        x_max = region[0]
+        x_min = region[1]
+        z_max = region[2]
+        z_min = region[3]
+        flag = region[4]
+        x_min = -np.inf if flag[0] else x_min
+        x_max = +np.inf if flag[1] else x_max
+        z_min = -np.inf if flag[2] else z_min
+        z_max = +np.inf if flag[3] else z_max
+
+        print('region:', point_cloud_path)
+        print('x_min:{}, x_max:{}, z_min:{}, z_max:{}'.format(x_min, x_max, z_min, z_max))
+
+        point_select_bbox = [x_min, x_max,  # [x_min, x_max, y_min, y_max, z_min, z_max]
+                             -np.inf, np.inf,
                              # 考虑原始点云的包围盒的y轴范围作为还原的范围，因为在partition时，没有考虑y轴方向
-                             extend_camera_bbox[2], extend_camera_bbox[3]]
+                             z_min, z_max]
+
         mask = extract_point_cloud(xyz, point_select_bbox)
         xyz_list.append(xyz[mask])
         features_dc_list.append(features_dc[mask])
@@ -134,6 +149,22 @@ def seamless_merge(model_path, partition_point_cloud_dir):
         opacities_list.append(opacities[mask])
         scales_list.append(scales[mask])
         rots_list.append(rots[mask])
+
+        fig, ax = plt.subplots()
+        x_pos = xyz[mask][:, 0]
+        z_pos = xyz[mask][:, 2]
+        ax.scatter(x_pos, z_pos, c='k', s=1)
+
+        rect = patches.Rectangle((x_min, z_min), x_max - x_min, z_max - z_min, linewidth=1, edgecolor='blue',
+                                 facecolor='none')
+        ax.add_patch(rect)
+        ax.title.set_text('Plot of 2D Points')
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Z-axis')
+        fig.tight_layout()
+        fig.savefig(os.path.join("data/rubble/global_models", f'{client}_pcd.png'), dpi=200)
+        plt.close(fig)
+        print('point_cloud_path:', point_cloud_path)
 
     points = np.concatenate(xyz_list, axis=0)
     features_dc_list = np.concatenate(features_dc_list, axis=0)
@@ -150,9 +181,21 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     scales_list = scales_list[mask]
     rots_list = rots_list[mask]
 
-    save_ply(save_merge_dir, points, features_dc_list, features_extra_list, opacities_list, scales_list, rots_list)
+    global_model = GaussianModel(3)
+    global_params = {'xyz': torch.from_numpy(points).float().cuda(),
+                     'rotation': torch.from_numpy(rots_list).float().cuda(),
+                     'scaling': torch.from_numpy(scales_list).float().cuda(),
+                     'opacity': torch.from_numpy(opacities_list).float().cuda(),
+                     'features_dc': torch.from_numpy(features_dc_list).float().cuda().permute(0, 2, 1),
+                     'features_rest': torch.from_numpy(features_extra_list).float().cuda().permute(0, 2, 1), }
+
+    global_model.set_params(global_params)
+    global_model.save_ply(save_merge_dir)
 
 
 if __name__ == '__main__':
-    seamless_merge("/home/kpl/develop/Pycharm/Projects/VastGaussian/output/rubble",
-                   "/home/kpl/develop/Pycharm/Projects/VastGaussian/output/rubble/point_cloud/iteration_10000")
+    local_model_path = 'data/rubble/output'
+    iteration = 60000
+    block_config = 'data/rubble/block.json'
+    save_merge_dir = f'data/rubble/global_models/global_merge_{iteration}.ply'
+    seamless_merge(local_model_path, iteration, block_config, save_merge_dir)
