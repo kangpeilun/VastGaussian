@@ -134,23 +134,66 @@ If you have any experiences and feedback on any code changes, feel free to conta
 1. The data format is the same as 3DGS, and the training command is basically the same as 3DGS. I didn't make too many personalized changes, you can refer to the following command (see `arguments/parameters.py` for more parameters):
 if you want to perform manhattan alignment:
 
+### Train your own dataset
+
 Using `threejs` for Manhattan alignment
 
 ```python
-python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --pos xx xx xx --rot xx xx xx
+python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --plantform threejs --pos xx xx xx --rot xx xx xx --num_gpus 1
 ```
 
 Using `cloudcompare` for Manhattan alignment
 
 ```python
 # The 9 elements of the rotation matrix should be filled in rot
-python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --pos xx xx xx --rot xx xx xx xx xx xx xx xx xx
+python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --plantform cloudcompare --pos xx xx xx --rot xx xx xx xx xx xx xx xx xx --num_gpus 1
 ```
 
-otherwise:
+Train without Manhattan alignment:
 ```python
 python train_vast.py -s datasets/xxx --exp_name test
 ```
+
+### Train Mill-19 and Urbanscene3D
+I get the preprocessed data from https://vastgaussian.github.io/, and implement Manhattan alignment, you can use my pos and rot params.
+```python
+# train rubble
+python train_vast.py -s ../datasets/Mill19/rubble --exp_name rubble --manhattan --pos 25.607364654541 0.000000000000 -12.012700080872 --rot 0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597 --num_gpus 2
+
+# train building
+python train_vast.py -s ../datasets/Mill19/building --exp_name building --manhattan --pos -62.527942657471 0.000000000000 -15.786898612976 --rot 0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759 --num_gpus 2
+```
+
+## Additional Parameter
+
+I added new parameters in `arguments/parameters.py`
+<details>
+<summary><span style="font-weight: bold;">New Parameters for train_vast.py</span></summary>
+
+#### --exp_name
+Experiment name
+#### --manhattan
+`store_true`, Whether to perform Manhattan alignment
+#### --plantform
+Platform for Manhattan alignment, choose in "cloudcompare" and "threejs"
+#### --pos
+Translation vector
+#### --rot
+rotate matrix
+#### --man_trans
+default=None, transformational matrix
+#### --m_region
+the number of regions in the x direction
+#### --n_region
+the number of regions in the z direction
+#### --extend_rate
+The rate of boundary expansion
+#### --visible_rate
+Airspace-aware visibility rate
+#### --num_gpus
+default=1, if =1 train model on 1 GPU, if =n train model on n GPUs
+</details>
+
 
 ## Datasets
 1. `Urbanscene3D`: https://github.com/Linxius/UrbanScene3D
