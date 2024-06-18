@@ -154,5 +154,5 @@ def seamless_merge(model_path, partition_point_cloud_dir):
 
 
 if __name__ == '__main__':
-    seamless_merge("/home/kpl/develop/Pycharm/Projects/VastGaussian/output/debug",
-                   "/home/kpl/develop/Pycharm/Projects/VastGaussian/output/debug/point_cloud/iteration_1000")
+    seamless_merge("/home/kpl/develop/Pycharm/Projects/VastGaussian/output/rubble",
+                   "/home/kpl/develop/Pycharm/Projects/VastGaussian/output/rubble/point_cloud/iteration_10000")

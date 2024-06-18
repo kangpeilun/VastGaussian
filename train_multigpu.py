@@ -184,7 +184,7 @@ def train_partition(dataset, opt, pipe, iter_start, iter_end, first_iter,
                 gaussians.optimizer.zero_grad(set_to_none=True)
 
             # 每500轮保存一次中间外观解耦图像
-            if iteration % 10 == 0:
+            if iteration % 1000 == 0:
                 decouple_image = decouple_image.cpu()
                 decouple_image = transforms.ToPILImage()(decouple_image)
                 save_dir = os.path.join(partition_scene.model_path, "decouple_images")
