@@ -183,7 +183,7 @@ def train_partition(dataset, opt, pipe, iter_start, iter_end, first_iter,
                 gaussians.optimizer.zero_grad(set_to_none=True)
 
             # 每500轮保存一次中间外观解耦图像
-            if iteration % 1000 == 0:
+            if iteration % 10 == 0:
                 decouple_image = decouple_image.cpu()
                 decouple_image = transforms.ToPILImage()(decouple_image)
                 save_dir = os.path.join(partition_scene.model_path, "decouple_images")
@@ -394,47 +394,23 @@ def train_main():
     big_scene = BigScene(lp)  # 这段代码整个都是加载数据集，同时包含高斯模型参数的加载
     training_round = len(big_scene.partition_data) // lp.num_gpus
     remainder = len(big_scene.partition_data) % lp.num_gpus  # 判断分块数是否可以被GPU均分，如果不可以均分则需要单独处理
-    for i in range(training_round):
-        partition_pool = [i + training_round * j for j in range(lp.num_gpus)]
 
-        processes = []
-        for index, device_id in enumerate(range(lp.num_gpus)):
-            torch.cuda.set_device(device_id)
-            partition_id = partition_pool[index]
-            # partition_id = 4
-            print(f"train partition {partition_id} on gpu {device_id}")
-            p = mp.Process(target=training, name=f"Partition_{partition_id}",
+    p1 = mp.Process(target=training, name=f"Partition_{0}",
                         args=(lp, op, pp, args.test_iterations, args.save_iterations,
-                     args.checkpoint_iterations, args.start_checkpoint, args.debug_from, tb_writer, partition_id,
-                     big_scene.partition_data[partition_id], device_id))
-            p.start()
-            processes.append(p)
+                     args.checkpoint_iterations, args.start_checkpoint, args.debug_from, tb_writer, 0,
+                     big_scene.partition_data[0], 0))
+    p2 = mp.Process(target=training, name=f"Partition_{1}",
+                    args=(lp, op, pp, args.test_iterations, args.save_iterations,
+                          args.checkpoint_iterations, args.start_checkpoint, args.debug_from, tb_writer, 1,
+                          big_scene.partition_data[1], 1))
 
-        for p in processes:
-            p.join()
+    p1.start()
+    p2.start()
 
-        torch.cuda.empty_cache()
+    p1.join()
+    p2.join()
 
-    if remainder != 0:
-        partition_pool = [lp.num_gpus*training_round + i for i in range(remainder)]
-
-        processes = []
-        for index, device_id in enumerate(range(lp.num_gpus)[:remainder]):
-            # torch.cuda.set_device(device_id)
-            partition_id = partition_pool[index]
-            print(f"train partition {partition_id} on gpu {device_id}")
-            p = mp.Process(target=training, name=f"Partition_{partition_id}",
-                        args=(lp, op, pp, args.test_iterations, args.save_iterations,
-                              args.checkpoint_iterations, args.start_checkpoint, args.debug_from, tb_writer,
-                              partition_id,
-                              big_scene.partition_data[partition_id], device_id))
-            p.start()
-            processes.append(p)
-
-        for p in processes:
-            p.join()
-
-        torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
 
     # seamless_merging 无缝合并
     print("Merging Partitions...")
