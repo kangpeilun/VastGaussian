@@ -100,28 +100,55 @@ class BigScene:
 class PartitionScene:
     gaussians: GaussianModel
 
-    def __init__(self, args, gaussians: GaussianModel, partition_id, partition_data,
-                 shuffle=True):
-        """
+    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, shuffle=True, resolution_scales=[1.0],logger = None):
+        """b
         :param path: Path to colmap scene main folder.
         """
         self.model_path = args.model_path
+        self.loaded_iter = None
         self.gaussians = gaussians
-        self.train_cameras = partition_data[0]
-        self.partition_id = partition_id
-        self.cameras_extent = partition_data[2]  # 对每个分块后的区域都分别计算一次cameras_extent
+
+        if load_iteration:
+            if load_iteration == -1:
+                self.loaded_iter = searchForMaxIteration(os.path.join(self.model_path, "point_cloud"))
+            else:
+                self.loaded_iter = load_iteration
+            if logger:
+                logger.info("Loading trained model at iteration {}".format(self.loaded_iter))
+            print("Loading trained model at iteration {}".format(self.loaded_iter))
+
+        self.train_cameras = {}
+        self.test_cameras = {}
+
+        scene_info = sceneLoadTypeCallbacks["ColmapVast"](args.source_path, args.model_path, args.images, args.eval, args.man_trans)
 
         if shuffle:
-            random.shuffle(self.train_cameras)  # Multi-res consistent random shuffling
+            random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling
+            random.shuffle(scene_info.test_cameras)  # Multi-res consistent random shuffling
 
-        self.gaussians.create_from_pcd(partition_data[1], self.cameras_extent)  # 对高斯模型的参数进行初始化, 主要使用3D点的xyz坐标，rgb值进行高斯模型的初始化
+        self.cameras_extent = scene_info.nerf_normalization["radius"]
+
+        for resolution_scale in resolution_scales:
+            print("Loading Training Cameras")
+            self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, args)
+            print("Loading Test Cameras")
+            self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, args)
+
+
+        if self.loaded_iter:
+            self.gaussians.load_ply(os.path.join(self.model_path,
+                                                           "point_cloud",
+                                                           "iteration_" + str(self.loaded_iter),
+                                                           "point_cloud.ply"))
+        else:
+            self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
 
     def save(self, iteration):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
-        self.gaussians.save_ply(os.path.join(point_cloud_path, f"point_cloud_{self.partition_id}.ply"))
+        self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
 
     def getTrainCameras(self, scale=1.0):
-        return self.train_cameras
+        return self.train_cameras[scale]
 
     def getTestCameras(self, scale=1.0):
-        return self.test_cameras
+        return self.test_cameras[scale]
