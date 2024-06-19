@@ -84,14 +84,28 @@ if exit_code != 0:
     exit(exit_code)
 
 files = os.listdir(args.source_path + "/sparse")
-os.makedirs(args.source_path + "/sparse/0", exist_ok=True)
+os.makedirs(args.source_path + "/sparse/1", exist_ok=True)
 # Copy each file from the source directory to the destination directory 将每个文件从源目录复制到目标目录
 for file in files:
-    if file == '0':
+    if file == '1':
         continue
     source_file = os.path.join(args.source_path, "sparse", file)
-    destination_file = os.path.join(args.source_path, "sparse", "0", file)
+    destination_file = os.path.join(args.source_path, "sparse", "1", file)
     shutil.move(source_file, destination_file)
+
+
+### Manhattan Alignment
+os.makedirs(args.source_path + "/sparse/0", exist_ok=True)
+orientation_aligner_cmd = (colmap_command + " model_orientation_aligner \
+    --image_path " + args.source_path + "/input \
+    --input_path " + args.source_path + "/sparse/1 \
+    --output_path " + args.source_path + "/sparse/0 \
+    --alignment_type manhattan")
+exit_code = os.system(orientation_aligner_cmd)
+if exit_code != 0:
+    logging.error(f"Manhattan Alignment failed with code {exit_code}. Exiting.")
+    exit(exit_code)
+
 
 if(args.resize):
     print("Copying and resizing...")

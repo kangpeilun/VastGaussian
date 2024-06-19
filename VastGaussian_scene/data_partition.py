@@ -350,7 +350,7 @@ class ProgressiveDataPartitioning:
                         # 筛选在j部分中的所有点中哪些可以投影在当前图像中
                         updated_points, updated_colors, updated_normals = self.point_in_image(pcd_j, camera.image_width,
                                                                                               camera.image_height,
-                                                                                              full_proj_transform)  # 在原始点云上需要新增的点 这一部写的for循环，速度有些慢，用多线程加速
+                                                                                              full_proj_transform)  # 在原始点云上需要新增的点
 
                         # 更新i部分的需要新增的点云，因为有许多相机可能会观察到相同的点云，因此需要对点云进行去重
                         new_points.append(updated_points)

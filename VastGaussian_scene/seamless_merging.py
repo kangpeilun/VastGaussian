@@ -8,13 +8,10 @@
 import os.path
 import pickle
 import numpy as np
-from glob import glob
-
 import torch
 from plyfile import PlyData, PlyElement
 
-from scene.dataset_readers import fetchPly, storePly
-
+from scene.gaussian_model import GaussianModel
 
 def load_ply(path):
     plydata = PlyData.read(path)
@@ -108,10 +105,6 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     with open(os.path.join(model_path, "partition_data.pkl"), "rb") as f:
         partition_scene = pickle.load(f)
 
-    all_partition_point_cloud = sorted(glob(os.path.join(partition_point_cloud_dir, "*.ply")),
-                                       key=lambda x: os.path.split(x)[-1].split(".")[0].rsplit("_", 1)[
-                                           1])  # 获取所有ply文件的路径
-
     # 遍历所有partition点云
     xyz_list = []
     features_dc_list = []
@@ -119,12 +112,13 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     opacities_list = []
     scales_list = []
     rots_list = []
-    for partition, point_cloud_path in zip(partition_scene, all_partition_point_cloud):
+    for partition in partition_scene:
+        point_cloud_path = os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_point_cloud.ply")
         xyz, features_dc, features_extra, opacities, scales, rots = load_ply(point_cloud_path)
         extend_camera_bbox = partition.extend_camera_bbox  # 原始相机包围盒
         extend_point_bbox = partition.extend_point_bbox  # 原始点云包围盒
         point_select_bbox = [extend_camera_bbox[0], extend_camera_bbox[1],  # [x_min, x_max, y_min, y_max, z_min, z_max]
-                             extend_point_bbox[2], extend_point_bbox[3],
+                             -np.inf, np.inf,
                              # 考虑原始点云的包围盒的y轴范围作为还原的范围，因为在partition时，没有考虑y轴方向
                              extend_camera_bbox[2], extend_camera_bbox[3]]
         mask = extract_point_cloud(xyz, point_select_bbox)
@@ -154,5 +148,5 @@ def seamless_merge(model_path, partition_point_cloud_dir):
 
 
 if __name__ == '__main__':
-    seamless_merge("/home/kpl/develop/Pycharm/Projects/VastGaussian/output/rubble",
-                   "/home/kpl/develop/Pycharm/Projects/VastGaussian/output/rubble/point_cloud/iteration_10000")
+    seamless_merge("/home/kpl/develop/Pycharm/Projects/VastGaussian/output/train",
+                   "/home/kpl/develop/Pycharm/Projects/VastGaussian/output/train/point_cloud/iteration_20")

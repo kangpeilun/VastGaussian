@@ -100,7 +100,7 @@ class BigScene:
 class PartitionScene:
     gaussians: GaussianModel
 
-    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, shuffle=True, resolution_scales=[1.0],logger = None):
+    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, shuffle=True, resolution_scales=[1.0], logger=None):
         """b
         :param path: Path to colmap scene main folder.
         """
@@ -121,7 +121,7 @@ class PartitionScene:
         self.train_cameras = {}
         self.test_cameras = {}
 
-        scene_info = sceneLoadTypeCallbacks["ColmapVast"](args.source_path, args.partition_model_path, args.partition_id, args.images, args.eval, args.man_trans)
+        scene_info = sceneLoadTypeCallbacks["ColmapVast"](args.source_path, args.partition_model_path, args.partition_id, args.images, args.eval, man_trans=None)  # 之前已经经过曼哈顿对齐，此时不用再次对齐
 
         if shuffle:
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling

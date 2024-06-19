@@ -250,9 +250,11 @@ def prepare_output_and_logger(args):
     with open(os.path.join(args.model_path, "cfg_args"), 'w') as cfg_log_f:
         var_dict = copy.deepcopy(vars(args))
         del_var_list = ["manhattan", "man_trans", "pos", "rot",
-                        "m_region", "n_region", "extend_rate", "visible_rate"]  # 删除多余的变量，防止无法使用SIBR可视化
-        for del_var in del_var_list:
-            del var_dict[del_var]
+                        "m_region", "n_region", "extend_rate", "visible_rate",
+                        "num_gpus", "partition_id", "partition_model_path", "plantform"]  # 删除多余的变量，防止无法使用SIBR可视化
+        for key in vars(args).keys():
+            if key in del_var_list:
+                del var_dict[key]
         cfg_log_f.write(str(Namespace(**var_dict)))
 
 
@@ -336,7 +338,7 @@ def train_main():
     parser.add_argument("--test_iterations", nargs="+", type=int,
                         default=[100, 1000, 7_000, 10_000, 30_000])  # 训练脚本在测试集上计算L1和PSNR的间隔迭代，默认为7000 30000。
     parser.add_argument("--save_iterations", nargs="+", type=int,
-                        default=[7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
+                        default=[100, 7_000, 30_000, 60_000])  # 训练脚本保存高斯模型的空格分隔迭代，默认为7000 30000 <迭代>。
     parser.add_argument("--quiet", default=False)  # 标记以省略写入标准输出管道的任何文本。
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])  # 空格分隔的迭代，在其中存储稍后继续的检查点，保存在模型目录中。
     parser.add_argument("--start_checkpoint", type=str, default=None)  # 路径保存检查点继续训练。
@@ -358,7 +360,7 @@ def train_main():
 
     tb_writer = prepare_output_and_logger(lp)
 
-    # 1.对大场景进行分块
+    # 对大场景进行分块
     scene_info = sceneLoadTypeCallbacks["Partition"](lp.source_path, lp.images, lp.man_trans)  # 得到一个场景的所有参数信息
     train_cameras = cameraList_from_camInfos_partition(scene_info.train_cameras, args=lp)
     DataPartitioning = ProgressiveDataPartitioning(scene_info, train_cameras, lp.model_path,
@@ -414,7 +416,6 @@ def train_main():
             partition_index = partition_pool[index]
             partition_id = partition_id_list[partition_index]
             print("train partition {} on gpu {}".format(partition_id, device_id))
-            print(f"train partition {partition_id} on gpu {device_id}")
             p = Process(target=parallel_local_training, name=f"Partition_{partition_id}",
                         args=(device_id, partition_id, lp, op, pp,
                               args.test_iterations, args.save_iterations, args.checkpoint_iterations,
