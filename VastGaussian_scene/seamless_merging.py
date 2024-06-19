@@ -112,6 +112,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     rots_list = []
     for partition in partition_scene:
         point_cloud_path = os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_point_cloud.ply")
+        if not os.path.exists(point_cloud_path): continue
         xyz, features_dc, features_extra, opacities, scales, rots = load_ply(point_cloud_path)
         extend_camera_bbox = partition.extend_camera_bbox  # 原始相机包围盒
         extend_point_bbox = partition.extend_point_bbox  # 原始点云包围盒

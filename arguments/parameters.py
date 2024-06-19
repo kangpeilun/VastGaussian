@@ -64,7 +64,7 @@ def ModelParams(parser):
     # data partition params
     parser.add_argument("--m_region", type=int, default=3, help="the number of regions in the x direction")  # 划分区域的数量，论文作者提醒虽然论文里写的是8块，但实操时用的是9块
     parser.add_argument("--n_region", type=int, default=3, help="the number of regions in the z direction")
-    parser.add_argument("--extend_rate", type=float, default=0.2, help="The rate of boundary expansion")
+    parser.add_argument("--extend_rate", type=float, default=0.7, help="The rate of boundary expansion")
     parser.add_argument("--visible_rate", type=float, default=0.25, help="Airspace-aware visibility rate")
 
     parser.add_argument("--num_gpus", type=int, default=1, help="if =1 train model on 1 GPU, if =n train model on n GPUs")
