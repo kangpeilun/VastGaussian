@@ -2,6 +2,7 @@
 .idea
 datasets
 output
+weights
 SIBR
 SIBR_viewers
 build

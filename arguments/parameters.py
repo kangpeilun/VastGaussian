@@ -62,21 +62,22 @@ def ModelParams(parser):
     parser.add_argument("--rot", nargs="+", type=float, default=[0, 0, 0])         # 点云平移，如果处理平台为cloudcompare，则rot为旋转矩阵，否则用threejs处理rot就为三个旋转向量
     parser.add_argument("--man_trans", default=None)  # 指定经过曼哈顿对齐后的点云坐标相对于初始点云坐标的变换矩阵
     # data partition params
-    parser.add_argument("--m_region", type=int, default=2, help="the number of regions in the x direction")  # 划分区域的数量，论文作者提醒虽然论文里写的是8块，但实操时用的是9块
-    parser.add_argument("--n_region", type=int, default=2, help="the number of regions in the z direction")
+    parser.add_argument("--m_region", type=int, default=3, help="the number of regions in the x direction")  # 划分区域的数量，论文作者提醒虽然论文里写的是8块，但实操时用的是9块
+    parser.add_argument("--n_region", type=int, default=3, help="the number of regions in the z direction")
     parser.add_argument("--extend_rate", type=float, default=0.2, help="The rate of boundary expansion")
     parser.add_argument("--visible_rate", type=float, default=0.25, help="Airspace-aware visibility rate")
 
     parser.add_argument("--num_gpus", type=int, default=1, help="if =1 train model on 1 GPU, if =n train model on n GPUs")
 
-
+    # Pre_train DAM
+    parser.add_argument("--pre_train_iteration", type=int, default=15_000, help="while m_region=1 and n_region=1, save {pre_train_iteration} DAM model")
 
     return parser
 
 
 def OptimizationParams(parser):
     # 下面是OptimizationParams，使用默认值即可
-    parser.add_argument("--iterations", type=int, default=20)  # 要训练的总迭代数，默认为30_000。
+    parser.add_argument("--iterations", type=int, default=30_000)  # 要训练的总迭代数，默认为30_000。
     parser.add_argument("--feature_lr", type=float, default=0.0025)  # 球面谐波具有学习率，默认为0.0025。
     parser.add_argument("--opacity_lr", type=float, default=0.05)  # 不透明学习率默认为0.05。
     parser.add_argument("--scaling_lr", type=float, default=0.005)  # 缩放学习率默认为0.005。

@@ -252,6 +252,22 @@ class GaussianModel:
             l.append('rot_{}'.format(i))
         return l
 
+    def save_DAM_model(self, iteration, pre_train_iteration, model_path, partition_num=1):
+        # 不分块进行预训练，保存预训练的模型参数进行初始化
+        if partition_num == 1:
+            # 如果只有一个块，则表示进行预训练
+            if iteration == pre_train_iteration:
+                # 训练30_000轮后保存一次模型
+                torch.save(self.appearance_network.state_dict(), os.path.join(model_path, "DAM.pth"))
+                print(f"Save iteration:{iteration} as pre-trained DAM model")
+
+    def load_DAM_model(self, model_path):
+        if os.path.exists(os.path.join(model_path, "DAM.pth")):
+            print("Load pre-trained DAM model")
+            self.appearance_network.load_state_dict(torch.load(os.path.join(model_path, "DAM.pth")))
+        else:
+            print("No pre-trained DAM model")
+
     def save_ply(self, path):
         mkdir_p(os.path.dirname(path))
 
@@ -292,38 +308,7 @@ class GaussianModel:
         elements[:] = list(map(tuple, attributes))
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
-    
-    @torch.no_grad()
-    def get_tetra_points(self):
-        M = trimesh.creation.box()
-        M.vertices *= 2
-        
-        rots = build_rotation(self._rotation)
-        xyz = self.get_xyz
-        scale = self.get_scaling_with_3D_filter * 3. # TODO test
-        # filter points with small opacity for bicycle scene
-        # opacity = self.get_opacity_with_3D_filter
-        # mask = (opacity > 0.1).squeeze(-1)
-        # xyz = xyz[mask]
-        # scale = scale[mask]
-        # rots = rots[mask]
-        
-        vertices = M.vertices.T    
-        vertices = torch.from_numpy(vertices).float().to("cuda").unsqueeze(0).repeat(xyz.shape[0], 1, 1)
-        # scale vertices first
-        vertices = vertices * scale.unsqueeze(-1)
-        vertices = torch.bmm(rots, vertices).squeeze(-1) + xyz.unsqueeze(-1)
-        vertices = vertices.permute(0, 2, 1).reshape(-1, 3).contiguous()
-        # concat center points
-        vertices = torch.cat([vertices, xyz], dim=0)
-        
-        # scale is not a good solution but use it for now
-        scale = scale.max(dim=-1, keepdim=True)[0]
-        scale_corner = scale.repeat(1, 8).reshape(-1, 1)
-        vertices_scale = torch.cat([scale_corner, scale], dim=0)
-        
-        return vertices, vertices_scale
-    
+
     def reset_opacity(self):
         opacities_new = inverse_sigmoid(torch.min(self.get_opacity, torch.ones_like(self.get_opacity) * 0.01))
         optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
@@ -506,7 +491,6 @@ class GaussianModel:
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling,
                                                         dim=1).values <= self.percent_dense * scene_extent)  # 高斯点云的尺寸比场景范围小到一定程度的点采用clone
-        # torch.max(self.get_scaling, dim=1).values 寻找每个点云在 x y z方向上的长度的最大值作为筛选的标准
 
         new_xyz = self._xyz[selected_pts_mask]  # 将筛选出来的点云的坐标复制到新变量，实现对点的克隆
         new_features_dc = self._features_dc[selected_pts_mask]
@@ -519,31 +503,6 @@ class GaussianModel:
                                    new_rotation)
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
-        # grads = self.xyz_gradient_accum / self.denom
-        # grads[grads.isnan()] = 0.0
-        #
-        # grads_abs = self.xyz_gradient_accum_abs / self.denom
-        # grads_abs[grads_abs.isnan()] = 0.0
-        # ratio = (torch.norm(grads, dim=-1) >= max_grad).float().mean()
-        # Q = torch.quantile(grads_abs.reshape(-1), 1 - ratio)
-        #
-        # before = self._xyz.shape[0]
-        # self.densify_and_clone(grads, max_grad, grads_abs, Q, extent)
-        # clone = self._xyz.shape[0]
-        #
-        # self.densify_and_split(grads, max_grad, grads_abs, Q, extent)
-        # split = self._xyz.shape[0]
-        #
-        # prune_mask = (self.get_opacity < min_opacity).squeeze()
-        # if max_screen_size:
-        #     big_points_vs = self.max_radii2D > max_screen_size
-        #     big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
-        #     prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
-        # self.prune_points(prune_mask)
-        # prune = self._xyz.shape[0]
-        # torch.cuda.empty_cache()
-        # return clone - before, split - clone, split - prune
-
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
 

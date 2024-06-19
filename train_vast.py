@@ -67,6 +67,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
+    model_weights_dir = os.path.join("weights", f"{dataset.exp_name}")
+    os.makedirs(model_weights_dir, exist_ok=True)  # 创建weights文件夹保存模型权重
+    gaussians.load_DAM_model(model_weights_dir)  # 加载预训练的外观解耦模型
+
     scene = PartitionScene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
@@ -148,6 +152,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     logger.info(f"Saving Gaussians at iteration {iteration}")
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
+
+            gaussians.save_DAM_model(iteration, dataset.pre_train_iteration, model_weights_dir, dataset.m_region*dataset.n_region)  # 在第pre_train_iteration次时保存DAM作为预训练权重
+            if dataset.m_region*dataset.n_region and iteration == dataset.pre_train_iteration:
+                print("[ITER {}] Saving pre-trained DAM model".format(iteration))
+                break
 
             # Densification
             if iteration < opt.densify_until_iter:
@@ -251,7 +260,8 @@ def prepare_output_and_logger(args):
         var_dict = copy.deepcopy(vars(args))
         del_var_list = ["manhattan", "man_trans", "pos", "rot",
                         "m_region", "n_region", "extend_rate", "visible_rate",
-                        "num_gpus", "partition_id", "partition_model_path", "plantform"]  # 删除多余的变量，防止无法使用SIBR可视化
+                        "num_gpus", "partition_id", "partition_model_path", "plantform",
+                        "pre_train_iteration"]  # 删除多余的变量，防止无法使用SIBR可视化
         for key in vars(args).keys():
             if key in del_var_list:
                 del var_dict[key]

@@ -194,6 +194,15 @@ Airspace-aware visibility rate
 default=1, if =1 train model on 1 GPU, if =n train model on n GPUs
 </details>
 
+## For Pre-trained Decouple Appearance Model(DAM)
+I provide a pre-trained DAM interface that you can use to pre-train your own DAM model as follows:
+1. Set `m_region` and `n_region` in the `arguments/parameters.py` file to `1`, that is, `m_region*n_region=1`
+2. Train according to the above method. When `iteration==pre_train_iteration`, the training stops automatically. The Pre-trained weights are saved in the `weights/exp_name/DAM.pth` folder
+3. Set the m_region and n_region to other number, and perform block training, such as `m_region=3, n_region=3`, The pre-trained `DAM.pth` is loaded automatically.
+
+You can also load the pre-trained model I provided to use it, as follows:
+1. Download the pre-trained model I provided and save it in the `weights/exp_name/DAM.pth` folder
+
 
 ## Datasets
 1. `Urbanscene3D`: https://github.com/Linxius/UrbanScene3D
