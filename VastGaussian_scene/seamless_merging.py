@@ -11,8 +11,6 @@ import numpy as np
 import torch
 from plyfile import PlyData, PlyElement
 
-from scene.gaussian_model import GaussianModel
-
 def load_ply(path):
     plydata = PlyData.read(path)
     max_sh_degree = 3
