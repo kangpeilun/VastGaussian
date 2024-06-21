@@ -121,7 +121,7 @@ class PartitionScene:
         self.train_cameras = {}
         self.test_cameras = {}
 
-        scene_info = sceneLoadTypeCallbacks["ColmapVast"](args.source_path, args.partition_model_path, args.partition_id, args.images, args.eval, man_trans=None)  # 之前已经经过曼哈顿对齐，此时不用再次对齐
+        scene_info = sceneLoadTypeCallbacks["ColmapVast"](args.source_path, args.partition_model_path, args.partition_id, args.images, args.eval, man_trans=args.man_trans)  # 之前已经经过曼哈顿对齐，此时不用再次对齐
 
         if shuffle:
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling

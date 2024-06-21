@@ -348,7 +348,7 @@ def readColmapSceneInfoVast(path, model_path, partition_id, images, eval, man_tr
     nerf_normalization = getNerfppNorm(train_cam_infos)  # 使用找到在世界坐标系下相机的几何中心
 
     ply_path = os.path.join(model_path, f"{partition_id}_visible.ply")
-    pcd = fetchPly(ply_path, man_trans)  # 得到稀疏点云中，各个3D点的属性信息
+    pcd = fetchPly(ply_path, man_trans=None)  # 得到稀疏点云中，各个3D点的属性信息，点云已经经过曼哈顿对齐，第二次加载不需要再进行对齐，否则点云坐标会发生变换
     # print(pcd)
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
