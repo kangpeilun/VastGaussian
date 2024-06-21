@@ -1,0 +1,12 @@
+plyfile==0.8.1
+tqdm
+trimesh
+open3d
+numpy
+scipy
+matplotlib
+opencv-python
+colorama
+shapely
+submodules/diff-gaussian-rasterization
+submodules/simple-knn
