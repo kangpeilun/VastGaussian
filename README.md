@@ -1,6 +1,4 @@
 # VastGaussian
-This is [Chinese](CHINESE.md) Version.
-
 ![img.png](assets/img_.png)
 
 This is `VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction` unofficial implementation, since this is my first time to recreate the complete code from scratch, the code may have some errors, and the code writing may seem a bit naive compared to some experts. Lack of engineering skills. But I got my foot in the door. I couldn't find any implementation of VastGaussian on the web, so I gave it a try.

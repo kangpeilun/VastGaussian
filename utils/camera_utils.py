@@ -9,7 +9,7 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
-from scene.cameras import Camera
+from scene.cameras import Camera, SimpleCamera
 import numpy as np
 from utils.general_utils import PILtoTorch
 from utils.graphics_utils import fov2focal
@@ -59,7 +59,7 @@ def cameraList_from_camInfos(cam_infos, resolution_scale, args):
 
     return camera_list
 
-def camera_to_JSON(id, camera : Camera):
+def camera_to_JSON(id, camera: Camera):
     Rt = np.zeros((4, 4))
     Rt[:3, :3] = camera.R.transpose()
     Rt[:3, 3] = camera.T
@@ -80,3 +80,27 @@ def camera_to_JSON(id, camera : Camera):
         'fx' : fov2focal(camera.FovX, camera.width)
     }
     return camera_entry
+
+
+def loadCamPartition(args, id, cam_info, image_width, image_height):
+    # image_width //= args.resolution
+    # image_height //= args.resolution
+
+    return SimpleCamera(
+        colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T,
+        FoVx=cam_info.FovX, FoVy=cam_info.FovY, image_name=cam_info.image_name,
+        uid=id, width=image_width, height=image_height, data_device=args.data_device)
+
+
+def cameraList_from_camInfos_partition(cam_infos, args):
+    camera_list = []
+
+    for id, c in enumerate(cam_infos):
+        image_width = c.width
+        image_height = c.height
+        camera_list.append(loadCamPartition(args, id, c,
+                                            image_width,
+                                            image_height,
+                                            ))   # 对图片进行缩放操作，scale=1表示没有对图片进行缩放
+
+    return camera_list

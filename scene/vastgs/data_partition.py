@@ -14,9 +14,9 @@ import numpy as np
 from typing import NamedTuple
 import pickle
 
-from scene.dataset_readers import CameraInfo, storePly, getNerfppNorm_partition
+from scene.dataset_readers import CameraInfo, storePly
 from utils.graphics_utils import BasicPointCloud
-from VastGaussian_scene.graham_scan import run_graham_scan
+from scene.vastgs.graham_scan import run_graham_scan
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -396,18 +396,18 @@ class ProgressiveDataPartitioning:
 
         return add_visible_camera_partition_list
 
-    def format_data(self):
-        """对经过数据分区后的数据的格式进行规范，使得和一开始的3DGS的数据格式一致
-        思路：1.输出每个partition的cameras
-             2.输出每个partition的点云
-             3.计算每个partition中相机的尺寸, 目前先使用通过整个场景计算出来的尺寸
-        """
-        format_data = []
-        for partition in self.partition_scene:
-            partition_id = partition.partition_id
-            point_cloud = partition.point_cloud
-            cameras = [CameraPose.camera for CameraPose in partition.cameras]
-            cameras_extent = getNerfppNorm_partition(cameras)["radius"]  # 对每个分块后的区域都分别计算一次cameras_extent
-            format_data.append([cameras, point_cloud, cameras_extent])
-
-        return format_data
+    # def format_data(self):
+    #     """对经过数据分区后的数据的格式进行规范，使得和一开始的3DGS的数据格式一致
+    #     思路：1.输出每个partition的cameras
+    #          2.输出每个partition的点云
+    #          3.计算每个partition中相机的尺寸, 目前先使用通过整个场景计算出来的尺寸
+    #     """
+    #     format_data = []
+    #     for partition in self.partition_scene:
+    #         partition_id = partition.partition_id
+    #         point_cloud = partition.point_cloud
+    #         cameras = [CameraPose.camera for CameraPose in partition.cameras]
+    #         cameras_extent = getNerfppNorm_partition(cameras)["radius"]  # 对每个分块后的区域都分别计算一次cameras_extent
+    #         format_data.append([cameras, point_cloud, cameras_extent])
+    #
+    #     return format_data

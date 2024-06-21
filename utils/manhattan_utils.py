@@ -32,6 +32,10 @@ def create_man_rans(position, rotation):
 
 
 def get_man_trans(lp):
+    lp.pos = [float(pos) for pos in lp.pos.split(" ")]
+    lp.rot = [float(rot) for rot in lp.rot.split(" ")]
+
+    man_trans = None
     if lp.manhattan and lp.plantform == "tj":  # threejs
         man_trans = create_man_rans(lp.pos, lp.rot)
         lp.man_trans = man_trans
@@ -41,6 +45,5 @@ def get_man_trans(lp):
         man_trans[:3, :3] = rot
         man_trans[:3, -1] = np.array(lp.pos)
         man_trans[3, 3] = 1
-        lp.man_trans = man_trans
 
-    return lp
+    return man_trans

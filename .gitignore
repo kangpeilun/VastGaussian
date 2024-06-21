@@ -1,6 +1,7 @@
 *.pyc
 .vscode
 output
+datasets
 build
 SIBR_viewers
 diff_rasterization/diff_rast.egg-info

@@ -9,30 +9,39 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import logging
 import os
 import torch
 from random import randint
 from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
 import sys
-from scene import Scene, GaussianModel
+from scene import Scene, GaussianModel, PartitionScene
+from scene.vastgs.appearance_network import decouple_appearance
 from utils.general_utils import safe_state
+from utils.partition_utils import data_partition
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
+from utils.manhattan_utils import get_man_trans
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
+import multiprocessing as mp
+
+
 try:
     from torch.utils.tensorboard import SummaryWriter
     TENSORBOARD_FOUND = True
 except ImportError:
     TENSORBOARD_FOUND = False
 
-def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+
+def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, logger=None):
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
-    scene = Scene(dataset, gaussians)
+    # scene = Scene(dataset, gaussians)
+    scene = PartitionScene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -85,10 +94,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         render_pkg = render(viewpoint_cam, gaussians, pipe, bg)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
-
+        # decouple appearance model
+        decouple_image, transformation_map = decouple_appearance(image, gaussians, viewpoint_cam.uid)
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()
-        Ll1 = l1_loss(image, gt_image)
+        # Ll1 = l1_loss(image, gt_image)
+        Ll1 = l1_loss(decouple_image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
         loss.backward()
 
@@ -104,8 +115,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 progress_bar.close()
 
             # Log and save
-            training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
+            training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background), logger=logger)
             if (iteration in saving_iterations):
+                if logger is not None:
+                    logger.info(f"Saving Gaussians at iteration {iteration}")
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
 
@@ -131,17 +144,67 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
+
+def parallel_local_training(gpu_id, partition_id, lp_args, op_args, pp_args, test_iterations, save_iterations, checkpoint_iterations,
+                            start_checkpoint, debug_from):
+    torch.cuda.set_device(gpu_id)
+
+    partition_model_path = f"{lp_args.model_path}/partition_point_cloud/visible"
+    lp_args.partition_id = partition_id
+    lp_args.partition_model_path = partition_model_path
+
+    logger = setup_logging(partition_id, file_path=partition_model_path)
+    # 启动训练
+    logger.info("Starting process")
+    training(lp_args, op_args, pp_args, test_iterations, save_iterations, checkpoint_iterations,start_checkpoint, debug_from, logger=logger)
+    logger.info("Finishing process")
+
+
+def setup_logging(partition_id, file_path):
+    # 创建一个 logger
+    logger = logging.getLogger(f'Client_{partition_id}')
+    logger.setLevel(logging.INFO)  # 设置日志级别
+
+    # 创建文件 handler，用于写入日志文件
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    file_handler = logging.FileHandler(f'{file_path}/Partition_{partition_id}.log')
+
+    # 创建 formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+
+    # 添加 handler 到 logger
+    logger.addHandler(file_handler)
+
+    return logger
+
+
 def prepare_output_and_logger(args):    
+    # if not args.model_path:
+    #     if os.getenv('OAR_JOB_ID'):
+    #         unique_str=os.getenv('OAR_JOB_ID')
+    #     else:
+    #         unique_str = str(uuid.uuid4())
+    #     args.model_path = os.path.join("./output/", unique_str[0:10])
+
     if not args.model_path:
-        if os.getenv('OAR_JOB_ID'):
-            unique_str=os.getenv('OAR_JOB_ID')
-        else:
-            unique_str = str(uuid.uuid4())
-        args.model_path = os.path.join("./output/", unique_str[0:10])
+        model_path = os.path.join("./output/", args.exp_name)
+        # 如果这个文件存在，就在这个文件名的基础上创建新的文件夹，文件名后面跟上1,2,3
+        if os.path.exists(model_path):
+            base_name = os.path.basename(model_path)
+            dir_name = os.path.dirname(model_path)
+            file_name, file_ext = os.path.splitext(base_name)
+            counter = 1
+            while os.path.exists(os.path.join(dir_name, f"{file_name}_{counter}{file_ext}")):
+                counter += 1
+            new_folder_name = f"{file_name}_{counter}{file_ext}"
+            model_path = os.path.join(dir_name, new_folder_name)
+        args.model_path = model_path
         
     # Set up output folder
     print("Output folder: {}".format(args.model_path))
-    os.makedirs(args.model_path, exist_ok = True)
+    os.makedirs(args.model_path, exist_ok=True)
     with open(os.path.join(args.model_path, "cfg_args"), 'w') as cfg_log_f:
         cfg_log_f.write(str(Namespace(**vars(args))))
 
@@ -153,7 +216,7 @@ def prepare_output_and_logger(args):
         print("Tensorboard not available: not logging progress")
     return tb_writer
 
-def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs):
+def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs, logger=None):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
         tb_writer.add_scalar('train_loss_patches/total_loss', loss.item(), iteration)
@@ -179,7 +242,9 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                     l1_test += l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
                 psnr_test /= len(config['cameras'])
-                l1_test /= len(config['cameras'])          
+                l1_test /= len(config['cameras'])
+                if logger is not None:
+                    logger.info("[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
                 print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
                 if tb_writer:
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
@@ -189,6 +254,8 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
             tb_writer.add_histogram("scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
             tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
         torch.cuda.empty_cache()
+
+
 
 if __name__ == "__main__":
     # Set up command line argument parser
@@ -204,11 +271,12 @@ if __name__ == "__main__":
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000, 30_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
-    parser.add_argument("--start_checkpoint", type=str, default = None)
+    parser.add_argument("--start_checkpoint", type=str, default=None)
     args = parser.parse_args(sys.argv[1:])
     args.save_iterations.append(args.iterations)
-    
-    print("Optimizing " + args.model_path)
+
+    lp, op, pp = lp.extract(args), op.extract(args), pp.extract(args)
+    print("Optimizing " + lp.model_path)
 
     # Initialize system state (RNG)
     safe_state(args.quiet)
@@ -216,7 +284,66 @@ if __name__ == "__main__":
     # Start GUI server, configure and run training
     network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
-    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+
+    # Manhattan Alignment
+    lp.man_trans = get_man_trans(lp)
+
+    # train multi gpu
+    mp.set_start_method('spawn', force=True)
+    tb_writer = prepare_output_and_logger(lp)
+
+    # data partition
+    partition_num, partition_id_list = data_partition(lp)
+
+    cuda_devices = torch.cuda.device_count()
+    print(f"Found {cuda_devices} CUDA devices")
+    training_round = partition_num // cuda_devices
+    remainder = partition_num % cuda_devices
+
+    # Main Loops
+    for i in range(training_round):
+        partition_pool = [i + training_round * j for j in range(cuda_devices)]
+
+        processes = []
+        for index, device_id in enumerate(range(cuda_devices)):
+            partition_index = partition_pool[index]
+            partition_id = partition_id_list[partition_index]
+            print("train partition {} on gpu {}".format(partition_id, device_id))
+            p = mp.Process(target=parallel_local_training, name=f"Partition_{partition_id}",
+                        args=(device_id, partition_id, lp, op, pp,
+                              args.test_iterations, args.save_iterations, args.checkpoint_iterations,
+                              args.start_checkpoint, args.debug_from))
+            processes.append(p)
+            p.start()
+
+        for p in processes:
+            p.join()  # 等待所有进程完成
+            # processes = []
+
+        torch.cuda.empty_cache()
+
+    if remainder != 0:
+        partition_pool = [cuda_devices * training_round + i for i in range(remainder)]
+        processes = []
+        for index, device_id in enumerate(range(cuda_devices)[:remainder]):
+            # torch.cuda.set_device(device_id)
+            partition_index = partition_pool[index]
+            partition_id = partition_id_list[partition_index]
+            print("train partition {} on gpu {}".format(partition_id, device_id))
+            p = mp.Process(target=parallel_local_training, name=f"Partition_{partition_id}",
+                        args=(device_id, partition_id, lp, op, pp,
+                              args.test_iterations, args.save_iterations, args.checkpoint_iterations,
+                              args.start_checkpoint, args.debug_from))
+            processes.append(p)
+            p.start()
+
+        for p in processes:
+            p.join()
+
+        torch.cuda.empty_cache()
+
+
+    # training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
 
     # All done
     print("\nTraining complete.")

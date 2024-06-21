@@ -102,6 +102,10 @@ class OptimizationParams(ParamGroup):
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
         self.random_background = False
+
+        # Appearance Decouple
+        self.appearance_embeddings_lr = 0.001
+        self.appearance_network_lr = 0.001
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):

@@ -2,6 +2,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+# https://github.com/autonomousvision/gaussian-opacity-fields
+def decouple_appearance(image, gaussians, view_idx):
+    appearance_embedding = gaussians.get_apperance_embedding(view_idx)
+    H, W = image.size(1), image.size(2)
+    # down sample the image
+    crop_image_down = torch.nn.functional.interpolate(image[None], size=(H // 32, W // 32), mode="bilinear", align_corners=True)[0]
+
+    crop_image_down = torch.cat([crop_image_down, appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)], dim=0)[None]
+    mapping_image = gaussians.appearance_network(crop_image_down, H, W).squeeze()
+    transformed_image = mapping_image * image
+
+    return transformed_image, mapping_image
+
+
 class UpsampleBlock(nn.Module):
     def __init__(self, num_input_channels, num_output_channels):
         super(UpsampleBlock, self).__init__()
