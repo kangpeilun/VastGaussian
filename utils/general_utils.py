@@ -39,27 +39,9 @@ def get_expon_lr_func(
     function of lr_delay_mult, such that the initial learning rate is
     lr_init*lr_delay_mult at the beginning of optimization but will be eased back
     to the normal learning rate when steps>lr_delay_steps.
-    连续学习率衰减函数。从JaxNeRF改编而来，当step=0时返回率为lr_init，
-    当step=max_steps时返回率为lr_final，并在其他地方进行对数线性插值(等同于指数衰减)。
-    如果lr_delay_steps>，那么学习率将被lr_delay_mult的一些平滑函数缩放，
-    例如在优化开始时的初始学习率是lr_init*lr_delay_mult，
-    但当步数为>lr_delay_steps时，学习率将回落到正常的学习率。
     :param conf: config subtree 'lr' or similar
     :param max_steps: int, the number of steps during optimization.
     :return HoF which takes step as input
-    """
-
-    """
-    这段代码定义了一个名为 `get_expon_lr_func` 的函数，用于生成连续的学习率衰减函数。
-    函数接受一些参数，包括初始学习率 `lr_init`、最终学习率 `lr_final`、学习率延迟步数 `lr_delay_steps`、学习率延迟倍数 `lr_delay_mult` 和最大步数 `max_steps`。
-    函数返回一个高阶函数，该函数以步数 `step` 作为输入，并根据给定的参数生成学习率衰减函数。
-    在函数内部，首先进行一些判断，如果步数小于0或者初始学习率和最终学习率都为0，则返回0.0，表示禁用该参数。
-    接着，如果学习率延迟步数大于0，则采用一种类似于余弦衰减的方式进行学习率的缩放。
-        具体地，通过一个平滑函数，将初始学习率缩放为 `lr_init * lr_delay_mult`，当步数超过 `lr_delay_steps` 时，学习率逐渐回到正常的学习率。
-    如果学习率延迟步数等于0，则将缩放率设置为1.0，表示不进行学习率的缩放。
-    然后，根据当前步数和最大步数的比例，进行对数线性插值，得到学习率。
-    最后，将学习率乘以缩放率，得到最终的学习率。
-    最终，返回生成的学习率衰减函数。
     """
 
     def helper(step):
@@ -78,7 +60,6 @@ def get_expon_lr_func(
         return delay_rate * log_lerp
 
     return helper
-
 
 def strip_lowerdiag(L):
     uncertainty = torch.zeros((L.shape[0], 6), dtype=torch.float, device="cuda")

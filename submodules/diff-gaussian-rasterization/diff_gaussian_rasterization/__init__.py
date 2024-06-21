@@ -81,7 +81,7 @@ class _RasterizeGaussians(torch.autograd.Function):
 
         # Invoke C++/CUDA rasterizer
         if raster_settings.debug:
-            cpu_args = cpu_deep_copy_tuple(args)  # Copy them before they can be corrupted
+            cpu_args = cpu_deep_copy_tuple(args) # Copy them before they can be corrupted
             try:
                 num_rendered, color, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
             except Exception as ex:

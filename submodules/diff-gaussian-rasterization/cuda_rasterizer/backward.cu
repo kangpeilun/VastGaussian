@@ -17,7 +17,6 @@ namespace cg = cooperative_groups;
 
 // Backward pass for conversion of spherical harmonics to RGB for
 // each Gaussian.
-// 每个高斯函数的球面谐波到RGB的反向转换。
 __device__ void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::vec3* means, glm::vec3 campos, const float* shs, const bool* clamped, const glm::vec3* dL_dcolor, glm::vec3* dL_dmeans, glm::vec3* dL_dshs)
 {
 	// Compute intermediate values, as it is done during forward
@@ -142,7 +141,6 @@ __device__ void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::
 // Backward version of INVERSE 2D covariance matrix computation
 // (due to length launched as separate kernel before other 
 // backward steps contained in preprocess)
-// 逆二维协方差矩阵计算的反向版本(由于在预处理中包含其他反向步骤之前，长度作为单独的核启动)
 __global__ void computeCov2DCUDA(int P,
 	const float3* means,
 	const int* radii,
@@ -586,7 +584,7 @@ void BACKWARD::preprocess(
 	// Somewhat long, thus it is its own kernel rather than being part of 
 	// "preprocess". When done, loss gradient w.r.t. 3D means has been
 	// modified and gradient w.r.t. 3D covariance matrix has been computed.	
-	computeCov2DCUDA <<<(P + 255) / 256, 256 >>> (
+	computeCov2DCUDA << <(P + 255) / 256, 256 >> > (
 		P,
 		means3D,
 		radii,
@@ -603,7 +601,7 @@ void BACKWARD::preprocess(
 	// Propagate gradients for remaining steps: finish 3D mean gradients,
 	// propagate color gradients to SH (if desireD), propagate 3D covariance
 	// matrix gradients to scale and rotation.
-	preprocessCUDA<NUM_CHANNELS> <<< (P + 255) / 256, 256 >>> (
+	preprocessCUDA<NUM_CHANNELS> << < (P + 255) / 256, 256 >> > (
 		P, D, M,
 		(float3*)means3D,
 		radii,
@@ -640,7 +638,7 @@ void BACKWARD::render(
 	float* dL_dopacity,
 	float* dL_dcolors)
 {
-	renderCUDA<NUM_CHANNELS> <<<grid, block >>>(
+	renderCUDA<NUM_CHANNELS> << <grid, block >> >(
 		ranges,
 		point_list,
 		W, H,

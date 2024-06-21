@@ -57,7 +57,7 @@ C4 = [
 def eval_sh(deg, sh, dirs):
     """
     Evaluate spherical harmonics at unit directions
-    using hardcoded SH polynomials. 使用硬编码SH多项式评估单位方向上的球面谐波。
+    using hardcoded SH polynomials.
     Works with torch/np/jnp.
     ... Can be 0 or more batch dimensions.
     Args:

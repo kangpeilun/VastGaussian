@@ -10,8 +10,7 @@
  */
 
 #pragma once
-// TODO: 调试时先去掉 <torch/extension.h>
-//#include <torch/extension.h>
+#include <torch/extension.h>
 #include <cstdio>
 #include <tuple>
 #include <string>
