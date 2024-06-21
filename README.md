@@ -11,6 +11,8 @@ If you have any experiences and feedback on any code changes, feel free to conta
 > 
 > WeChat: k374774222
 
+<a style="color: red">*I'm trying to refactor this repository, and the current code looks a bit messy and disorganized*</a>
+
 ## ToDo List
 - [x] ~~Camera-position-based region division is implemented~~
 
