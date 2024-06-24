@@ -34,7 +34,7 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 - [x] ~~Parallel training of $m\times n$ regions on $n$ GPUs is implemented after dividing the point cloud~~ Thanks [livion](https://github.com/Livioni) a lot.
 
-- [x] ~~Refine Seamless Merging~~
+- [ ] Refine Seamless Merging
 
 - [ ] Experiments are carried out on UrbanScene3D and Mill-19 datasets
 - [ ] Fix bugs, and bugs, and bugs ...
