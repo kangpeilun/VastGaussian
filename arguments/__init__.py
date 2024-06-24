@@ -54,7 +54,7 @@ class ModelParams(ParamGroup):
         self._white_background = False
         self.data_device = "cuda"
         self.eval = False
-
+        self.llffhold = 83  # 可以被llffhold整除的图像索引，作为测试机
         # New Params
         self.exp_name = ""
         # Manhattan

@@ -11,6 +11,7 @@
 
 import logging
 import os
+from glob import glob
 import torch
 from random import randint
 from utils.loss_utils import l1_loss, ssim
@@ -19,7 +20,7 @@ import sys
 from scene import Scene, GaussianModel, PartitionScene
 from scene.vastgs.appearance_network import decouple_appearance
 from utils.general_utils import safe_state
-from utils.partition_utils import data_partition
+from utils.partition_utils import data_partition, read_camList
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
@@ -27,6 +28,7 @@ from utils.manhattan_utils import get_man_trans
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 import multiprocessing as mp
+from seamless_merging import seamless_merge
 
 
 try:
@@ -37,6 +39,9 @@ except ImportError:
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, logger=None):
+    # read train and test camera list
+    test_camList = read_camList(dataset.model_path + "/test_cameras.txt")
+
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
@@ -96,8 +101,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         # decouple appearance model
         decouple_image, transformation_map = decouple_appearance(image, gaussians, viewpoint_cam.uid)
-        # Loss
         gt_image = viewpoint_cam.original_image.cuda()
+
+        if viewpoint_cam.image_name in test_camList:
+            # 如果该图片在测试集中，移除该图像的右半边用于test，仅使用左半边图像进行train
+            gt_image = gt_image[..., :gt_image.shape[-1] // 2]
+            image = image[..., :image.shape[-1] // 2]
+            decouple_image = decouple_image[..., :decouple_image.shape[-1] // 2]
+
+        # Loss
         # Ll1 = l1_loss(image, gt_image)
         Ll1 = l1_loss(decouple_image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
@@ -138,7 +150,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # Optimizer step
             if iteration < opt.iterations:
                 gaussians.optimizer.step()
-                gaussians.optimizer.zero_grad(set_to_none = True)
+                gaussians.optimizer.zero_grad(set_to_none=True)
 
             if (iteration in checkpoint_iterations):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
@@ -294,6 +306,10 @@ if __name__ == "__main__":
 
     # data partition
     partition_num, partition_id_list = data_partition(lp)
+    # # read train and test camera list
+    # global train_camList, test_camList
+    # train_camList = read_camList(lp.model_path + "/train_cameras.txt")
+    # test_camList = read_camList(lp.model_path + "/test_cameras.txt")
 
     cuda_devices = torch.cuda.device_count()
     print(f"Found {cuda_devices} CUDA devices")
@@ -342,8 +358,14 @@ if __name__ == "__main__":
 
         torch.cuda.empty_cache()
 
+    print("\nTraining complete.")
 
-    # training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+    # seamless_merging 无缝合并
+    print("Merging Partitions...")
+    all_point_cloud_dir = glob(os.path.join(lp.model_path, "point_cloud", "*"))
+
+    for point_cloud_dir in all_point_cloud_dir:
+        seamless_merge(lp.model_path, point_cloud_dir)
 
     # All done
-    print("\nTraining complete.")
+    print("All Done!")

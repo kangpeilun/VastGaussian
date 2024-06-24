@@ -22,6 +22,7 @@ import json
 from pathlib import Path
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import SH2RGB
+from utils.partition_utils import read_camList
 from scene.gaussian_model import BasicPointCloud
 
 class CameraInfo(NamedTuple):
@@ -181,7 +182,69 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, man_trans):
     sys.stdout.write('\n')
     return cam_infos
 
-def fetchPly(path, man_trans):
+
+def readColmapCamerasEval(cam_extrinsics, cam_intrinsics, images_folder, man_trans, model_path):
+    test_camList = read_camList(os.path.join(model_path, "test_cameras.txt"))
+    cam_infos = []
+    for idx, key in enumerate(cam_extrinsics):
+        sys.stdout.write('\r')
+        # the exact output you're looking for:
+        sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cam_extrinsics)))
+        sys.stdout.flush()
+
+        extr = cam_extrinsics[key]
+        intr = cam_intrinsics[extr.camera_id]
+        height = intr.height
+        width = intr.width
+
+        uid = intr.id
+        R = np.transpose(qvec2rotmat(extr.qvec))
+        T = np.array(extr.tvec)
+
+        if man_trans is None:
+            R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
+            T = np.array(extr.tvec)  # 获取该图片的平移向量
+        else:
+            R = np.transpose(qvec2rotmat(extr.qvec))  # 由四元数获取该图片的旋转矩阵，得到世界->相机坐标的旋转矩阵
+            T = np.array(extr.tvec)  # 获取该图片的平移向量
+
+            W2C = np.zeros((4, 4))
+            W2C[:3, :3] = R.transpose()
+            W2C[:3, -1] = T
+            W2C[3, 3] = 1.0
+            W2nC = W2C @ np.linalg.inv(man_trans)   # 相机跟着点云旋转平移后得到新的相机坐标系nC
+
+            R = W2nC[:3, :3]
+            R = R.transpose()
+            T = W2nC[:3, -1]
+
+        if intr.model=="SIMPLE_PINHOLE":
+            focal_length_x = intr.params[0]
+            FovY = focal2fov(focal_length_x, height)
+            FovX = focal2fov(focal_length_x, width)
+        elif intr.model=="PINHOLE":
+            focal_length_x = intr.params[0]
+            focal_length_y = intr.params[1]
+            FovY = focal2fov(focal_length_y, height)
+            FovX = focal2fov(focal_length_x, width)
+        else:
+            assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
+
+        image_path = os.path.join(images_folder, os.path.basename(extr.name))
+        image_name = os.path.basename(image_path).split(".")[0]
+        if image_name in test_camList:
+            # 只读取测试机的图片
+            image = Image.open(image_path)
+        else:
+            continue
+
+        cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+                              image_path=image_path, image_name=image_name, width=width, height=height)
+        cam_infos.append(cam_info)
+    sys.stdout.write('\n')
+    return cam_infos
+
+def fetchPly(path, man_trans=None):
     plydata = PlyData.read(path)
     vertices = plydata['vertex']  # 提取点云的顶点
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T  # 将x,y,z这三个坐标属性堆叠在一起
@@ -214,7 +277,7 @@ def storePly(path, xyz, rgb):
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
 
-def readColmapSceneInfo(path, images, eval, llffhold=8):
+def readColmapSceneInfo(path, images, eval, llffhold=83):
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -262,7 +325,8 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
     return scene_info
 
 
-def readColmapSceneInfoVast(path, model_path, partition_id, images, eval, man_trans, llffhold=8):
+def readColmapSceneInfoVast(path, model_path, partition_id, images, eval, man_trans, llffhold=83):
+    # 读取每个partition的点云，以及对应的相机
     # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
     client_camera_txt_path = os.path.join(model_path, f"{partition_id}_camera.txt")
     with open(client_camera_txt_path, 'r', encoding='utf-8') as file:
@@ -274,9 +338,9 @@ def readColmapSceneInfoVast(path, model_path, partition_id, images, eval, man_tr
     cam_extrinsics = read_extrinsics_binary_vast(cameras_extrinsic_file, lines)
     cam_intrinsics = read_intrinsics_binary_vast(cameras_intrinsic_file, lines)
 
-    reading_dir = "images" if images == None else images
+    images_dir = os.path.join(path, "images")
     cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics,
-                                           images_folder=os.path.join(path, reading_dir),
+                                           images_folder=images_dir,
                                            man_trans=man_trans)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
     cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)  # 根据图片名称对 list进行排序
 
@@ -300,7 +364,40 @@ def readColmapSceneInfoVast(path, model_path, partition_id, images, eval, man_tr
     return scene_info
 
 
-def partition(path, images, man_trans):
+def readColmapSceneInfoEval(path, images, man_trans, model_path):
+    try:
+        cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
+        cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
+        cam_extrinsics = read_extrinsics_binary(cameras_extrinsic_file)
+        cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)
+    except:
+        cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.txt")
+        cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.txt")
+        cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
+        cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
+
+    images_dir = os.path.join(path, "images")
+    cam_infos_unsorted = readColmapCamerasEval(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=images_dir, man_trans=man_trans, model_path=model_path)
+    cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
+
+    train_cam_infos = []
+    test_cam_infos = cam_infos
+
+    nerf_normalization = getNerfppNorm(test_cam_infos)
+
+    ply_path = None
+    pcd = None
+
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=test_cam_infos,
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)
+    return scene_info
+
+
+def partition(path, images, man_trans, eval, llffhold=83):
+    # 读取整个场景的点云和相机参数，用于分块
     # 读取所有图像的信息，包括相机内外参数，以及3D点云坐标
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")  # 相机外参文件
@@ -313,14 +410,18 @@ def partition(path, images, man_trans):
         cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
         cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
 
-    reading_dir = "images" if images == None else images
+    reading_dir = os.path.join(path, "images")
     cam_infos_unsorted = readColmapCamerasPartition(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics,
                                                     images_folder=reading_dir,
                                                     man_trans=man_trans)  # 存储所有图片的 相机模型id，旋转矩阵 平移向量，视角场，图片数据，图片路径，图片名，图片宽高
     cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)  # 根据图片名称对 list进行排序
 
-    train_cam_infos = cam_infos  # 得到训练图片的相机参数
-    test_cam_infos = []
+    if eval:
+        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
+        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
+    else:
+        train_cam_infos = cam_infos
+        test_cam_infos = []
 
     nerf_normalization = getNerfppNorm(train_cam_infos)  # 使用找到在世界坐标系下相机的几何中心
     # 将3D点云数据写入 scene_info中
@@ -438,5 +539,6 @@ sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
     "Blender": readNerfSyntheticInfo,
     "ColmapVast": readColmapSceneInfoVast,
+    "ColmapEval": readColmapSceneInfoEval,
     "Partition": partition
 }
