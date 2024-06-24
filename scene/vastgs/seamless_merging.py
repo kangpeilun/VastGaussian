@@ -17,6 +17,32 @@ from scene.gaussian_model import GaussianModel
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+
+def extend_inf_x_z_bbox(partition_id, m_region, n_region):
+    # bbox: [x_min, x_max, z_min, z_max]
+    # m_region and n_region must >= 2
+    # 进行无缝合并，需要根据partition所在位置作战original bbox的x z轴的范围，从而进行无缝合并后包含背景元素
+    x, z = int(partition_id.split("_")[0]), int(partition_id.split("_")[1])  # 获取块所在编号
+    if x == 1 and z == 1:  # 左上角
+        return [True, False, True, False]
+    if x == m_region and z == 1:  # 右上角
+        return [False, True, True, False]
+    if x == 1 and z == n_region:  # 左下角
+        return [True, False, False, True]
+    if x == m_region and z == n_region:  # 右下角
+        return [False, True, False, True]
+    if 2 <= x <= m_region-1 and z == 1:  # 最上边中间
+        return [False, False, True, False]
+    if 2 <= z <= n_region-1 and x == 1:  # 最左边中间
+        return [True, False, False, False]
+    if 2 <= x <= m_region-1 and z == n_region:  # 最下边中间
+        return [False, False, False, True]
+    if 2 <= z <= n_region-1 and x == m_region:  # 最右边中间
+        return [False, True, False, False]
+    if 2 <= x <= m_region-1 and 2 <= z <= n_region-1:  # 中间
+        return [False, False, False, False]
+
+
 def load_ply(path):
     plydata = PlyData.read(path)
     max_sh_degree = 3
@@ -54,46 +80,6 @@ def load_ply(path):
     return xyz, features_dc, features_extra, opacities, scales, rots
 
 
-def construct_list_of_attributes(self):
-    l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
-    # All channels except the 3 DC
-    for i in range(self._features_dc.shape[1] * self._features_dc.shape[2]):
-        l.append('f_dc_{}'.format(i))
-    for i in range(self._features_rest.shape[1] * self._features_rest.shape[2]):
-        l.append('f_rest_{}'.format(i))
-    l.append('opacity')
-    for i in range(self._scaling.shape[1]):
-        l.append('scale_{}'.format(i))
-    for i in range(self._rotation.shape[1]):
-        l.append('rot_{}'.format(i))
-    return l
-
-
-def save_ply(path, xyz, f_dc, f_rest, opacities, scale, rotation):
-    normals = np.zeros_like(xyz)
-
-    l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
-    for i in range(f_dc.shape[1] * f_dc.shape[2]):
-        l.append('f_dc_{}'.format(i))
-    for i in range(f_rest.shape[1] * f_rest.shape[2]):
-        l.append('f_rest_{}'.format(i))
-    l.append('opacity')
-    for i in range(scale.shape[1]):
-        l.append('scale_{}'.format(i))
-    for i in range(rotation.shape[1]):
-        l.append('rot_{}'.format(i))
-    dtype_full = [(attribute, 'f4') for attribute in l]
-
-    f_dc = torch.tensor(f_dc).transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
-    f_rest = torch.tensor(f_rest).transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
-
-    elements = np.empty(xyz.shape[0], dtype=dtype_full)
-    attributes = np.concatenate((xyz, normals, f_dc, f_rest, opacities, scale, rotation), axis=1)
-    elements[:] = list(map(tuple, attributes))
-    el = PlyElement.describe(elements, 'vertex')
-    PlyData([el]).write(path)
-
-
 def extract_point_cloud(points, bbox):
     """根据camera的边界从初始点云中筛选对应partition的点云"""
     mask = (points[:, 0] >= bbox[0]) & (points[:, 0] <= bbox[1]) & (
@@ -109,6 +95,13 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     with open(os.path.join(model_path, "partition_data.pkl"), "rb") as f:
         partition_scene = pickle.load(f)
 
+    m_region, n_region = 0, 0
+    # 获取分成了多少块
+    for partition in partition_scene:
+        m, n = int(partition.partition_id.split("_")[0]), int(partition.partition_id.split("_")[1])
+        if m > m_region: m_region = m
+        if n > n_region: n_region = n
+
     # 遍历所有partition点云
     xyz_list = []
     features_dc_list = []
@@ -116,17 +109,30 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     opacities_list = []
     scales_list = []
     rots_list = []
-    
+
     for partition in partition_scene:
         point_cloud_path = os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_point_cloud.ply")
         xyz, features_dc, features_extra, opacities, scales, rots = load_ply(point_cloud_path)
         extend_camera_bbox = partition.extend_camera_bbox  # 原始相机包围盒
-        extend_point_bbox = partition.extend_point_bbox  # 原始点云包围盒
         x_max = extend_camera_bbox[1]
         x_min = extend_camera_bbox[0]
         z_max = extend_camera_bbox[3]
         z_min = extend_camera_bbox[2]
 
+        flag = extend_inf_x_z_bbox(partition.partition_id, m_region, n_region)
+        if partition.partition_id == "1_1":
+            flag = [True, False, True, True]
+        if partition.partition_id == "2_1":
+            flag = [False, True, True, True]
+
+        x_max = np.inf if flag[1] else x_max
+        x_min = -np.inf if flag[0] else x_min
+        z_max = np.inf if flag[3] else z_max
+        z_min = -np.inf if flag[2] else z_min
+        # x_max = np.inf
+        # x_min = -np.inf
+        # z_max = np.inf
+        # z_min = -np.inf
         print('region:', point_cloud_path)
         print('x_min:{}, x_max:{}, z_min:{}, z_max:{}'.format(x_min, x_max, z_min, z_max))
         
@@ -180,11 +186,11 @@ def seamless_merge(model_path, partition_point_cloud_dir):
                      'opacity': torch.from_numpy(opacities_list).float().cuda(),
                      'features_dc': torch.from_numpy(features_dc_list).float().cuda().permute(0, 2, 1),
                      'features_rest': torch.from_numpy(features_extra_list).float().cuda().permute(0, 2, 1)}
-    
+
     global_model.set_params(global_params)
     global_model.save_ply(save_merge_dir)
 
 
 if __name__ == '__main__':
     seamless_merge("output/train",
-                   "output/train/point_cloud/iteration_30000")
+                   "output/train/point_cloud/iteration_60000")

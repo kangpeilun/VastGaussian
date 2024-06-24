@@ -84,7 +84,8 @@ class ProgressiveDataPartitioning:
             extend_bbox = partition.extend_camera_bbox
             x_min, x_max, z_min, z_max = ori_bbox
             ex_x_min, ex_x_max, ex_z_min, ex_z_max = extend_bbox
-            rect_ori = patches.Rectangle((x_min, z_min), x_max-x_min, z_max-z_min, linewidth=1, edgecolor='blue', facecolor='none')
+            rect_ori = patches.Rectangle((x_min, z_min), x_max - x_min, z_max - z_min, linewidth=1, edgecolor='blue',
+                                         facecolor='none')
             rect_ext = patches.Rectangle((ex_x_min, ex_z_min), ex_x_max-ex_x_min, ex_z_max-ex_z_min, linewidth=1, edgecolor='y', facecolor='none')
             self.ax.add_patch(rect_ori)
             self.ax.add_patch(rect_ext)

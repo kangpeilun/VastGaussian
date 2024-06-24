@@ -177,7 +177,7 @@ class Scene_Eval:
     # Eval for Vastgs
     gaussians : GaussianModel
 
-    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, shuffle=True, resolution_scales=[1.0],logger = None):
+    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, shuffle=False, resolution_scales=[1.0],logger = None):
         """b
         :param path: Path to colmap scene main folder.
         """
