@@ -42,23 +42,20 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 ## Some notes
 
-1. I made some changes to the original 3DGS. First of all, I took the hyperparameters of 3DGS from `arguments/__init__.py` and put them into `arguments/parameters.py` file to make it easier to read and understand the hyperparameters
-2. In order not to change the original directory structure of 3DGS, I added a new `VastGaussian_scene` module to store VastGaussian. Part of the code I called the existing functions in the `scene` folder. Also to fix the `import` error, I moved the Scene class into the datasets.py folder
+1. In order not to change the original directory structure of 3DGS, I added a new `scene/vastgs` module to store VastGaussian. Part of the code I called the existing functions in the `scene` folder. Also to fix the `import` error, I moved the Scene class into the datasets.py folder
 
 <div align="center">
-    <img src=assets/img2.png align="center"> 
-    <img src=assets/img_1.png align="center">
+    <img src=assets/img_21.png align="center">
 </div>
 
-3. The naming of the files is consistent with the method mentioned in the paper for easy reading
+2. The naming of the files is consistent with the method mentioned in the paper for easy reading
 
-> - `datasets.py` I have rewritten the Scene class in 3DGS into BigScene and PartitionScene. The former represents the original scene BigScene, and the latter represents the PartitionScene of each small scene after Partition.
 > - `data_partition.py` corresponding to the `Progressive Data Partitioning` in the paper.
 >  <div align="center">
 >       <img src=assets/img_3.png width=800>
 >  </div>
 >
-> - `scene/appearance_network.py`  corresponding to the `Decoupled Appearance Modeling` in the paper. We refer to the implementation of [gaussian-opacity-fields](https://github.com/autonomousvision/gaussian-opacity-fields)
+> - `scene/vastgs/appearance_network.py`  corresponding to the `Decoupled Appearance Modeling` in the paper. I refer to the implementation of [gaussian-opacity-fields](https://github.com/autonomousvision/gaussian-opacity-fields)
 >  
 >    <div align="center">
 >        <img src=assets/img.png align="center" height=400>
@@ -161,10 +158,10 @@ python train_vast.py -s datasets/xxx --exp_name test
 I get the preprocessed data from https://vastgaussian.github.io/, and implement Manhattan alignment, you can use my pos and rot params.
 ```python
 # train rubble
-python train_vast.py -s ../datasets/Mill19/rubble --exp_name rubble --manhattan --pos "25.607364654541 0.000000000000 -12.012700080872" --rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597"
+python train_vast.py -s ../datasets/Mill19/rubble --exp_name rubble --manhattan --pos "25.607364654541 0.000000000000 -12.012700080872" --rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" --eval --llffhold 83
 
 # train building
-python train_vast.py -s ../datasets/Mill19/building --exp_name building --manhattan --pos "-62.527942657471 0.000000000000 -15.786898612976" --rot "0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759"
+python train_vast.py -s ../datasets/Mill19/building --exp_name building --manhattan --pos "-62.527942657471 0.000000000000 -15.786898612976" --rot "0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759" --eval --llffhold 83
 ```
 
 ## Additional Parameter

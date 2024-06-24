@@ -11,6 +11,7 @@
 
 import logging
 import os
+import copy
 from glob import glob
 import torch
 from random import randint
@@ -218,7 +219,15 @@ def prepare_output_and_logger(args):
     print("Output folder: {}".format(args.model_path))
     os.makedirs(args.model_path, exist_ok=True)
     with open(os.path.join(args.model_path, "cfg_args"), 'w') as cfg_log_f:
-        cfg_log_f.write(str(Namespace(**vars(args))))
+        var_dict = copy.deepcopy(vars(args))
+        del_var_list = ["manhattan", "man_trans", "pos", "rot",
+                        "m_region", "n_region", "extend_rate", "visible_rate",
+                        "num_gpus", "partition_id", "partition_model_path", "plantform",
+                        "llffhold"]  # 删除多余的变量，防止无法使用SIBR可视化
+        for key in vars(args).keys():
+            if key in del_var_list:
+                del var_dict[key]
+        cfg_log_f.write(str(Namespace(**var_dict)))
 
     # Create Tensorboard writer
     tb_writer = None
@@ -288,7 +297,6 @@ if __name__ == "__main__":
     args.save_iterations.append(args.iterations)
 
     lp, op, pp = lp.extract(args), op.extract(args), pp.extract(args)
-    print("Optimizing " + lp.model_path)
 
     # Initialize system state (RNG)
     safe_state(args.quiet)
@@ -306,10 +314,6 @@ if __name__ == "__main__":
 
     # data partition
     partition_num, partition_id_list = data_partition(lp)
-    # # read train and test camera list
-    # global train_camList, test_camList
-    # train_camList = read_camList(lp.model_path + "/train_cameras.txt")
-    # test_camList = read_camList(lp.model_path + "/test_cameras.txt")
 
     cuda_devices = torch.cuda.device_count()
     print(f"Found {cuda_devices} CUDA devices")
