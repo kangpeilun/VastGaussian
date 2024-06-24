@@ -97,7 +97,7 @@ def extract_point_cloud(points, bbox):
 
 
 def seamless_merge(model_path, partition_point_cloud_dir):
-    save_merge_dir = os.path.join(partition_point_cloud_dir, "point_cloud.ply")
+    save_merge_dir = os.path.join(partition_point_cloud_dir, "point_cloud_1.ply")
 
     # 加载partition数据
     with open(os.path.join(model_path, "partition_data.pkl"), "rb") as f:

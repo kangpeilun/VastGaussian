@@ -220,6 +220,15 @@ class GaussianModel:
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
 
+    def set_params(self, param_dict):
+        for key, param in param_dict.items():
+            if key == 'app_mlp':
+                self.mlp.load_state_dict(param)
+            elif key == 'app_pos_emb':
+                self.pos_emb.load_state_dict(param)
+            else:
+                setattr(self, '_'+key, nn.Parameter(param.requires_grad_(True).cuda()))
+
     def reset_opacity(self):
         opacities_new = inverse_sigmoid(torch.min(self.get_opacity, torch.ones_like(self.get_opacity)*0.01))
         optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
