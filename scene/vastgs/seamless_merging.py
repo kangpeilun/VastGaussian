@@ -6,10 +6,16 @@
 # Time: 5/15/24 2:31 PM
 # Des: 无缝合并
 import os.path
-import pickle
+import json
 import numpy as np
+from glob import glob
+import pickle
+
 import torch
 from plyfile import PlyData, PlyElement
+from scene.gaussian_model import GaussianModel
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 def load_ply(path):
     plydata = PlyData.read(path)
@@ -97,7 +103,7 @@ def extract_point_cloud(points, bbox):
 
 
 def seamless_merge(model_path, partition_point_cloud_dir):
-    save_merge_dir = os.path.join(partition_point_cloud_dir, "point_cloud_1.ply")
+    save_merge_dir = os.path.join(partition_point_cloud_dir, "point_cloud.ply")
 
     # 加载partition数据
     with open(os.path.join(model_path, "partition_data.pkl"), "rb") as f:
@@ -110,15 +116,25 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     opacities_list = []
     scales_list = []
     rots_list = []
+    
     for partition in partition_scene:
         point_cloud_path = os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_point_cloud.ply")
         xyz, features_dc, features_extra, opacities, scales, rots = load_ply(point_cloud_path)
         extend_camera_bbox = partition.extend_camera_bbox  # 原始相机包围盒
         extend_point_bbox = partition.extend_point_bbox  # 原始点云包围盒
-        point_select_bbox = [extend_camera_bbox[0], extend_camera_bbox[1],  # [x_min, x_max, y_min, y_max, z_min, z_max]
+        x_max = extend_camera_bbox[1]
+        x_min = extend_camera_bbox[0]
+        z_max = extend_camera_bbox[3]
+        z_min = extend_camera_bbox[2]
+
+        print('region:', point_cloud_path)
+        print('x_min:{}, x_max:{}, z_min:{}, z_max:{}'.format(x_min, x_max, z_min, z_max))
+        
+        point_select_bbox = [x_min, x_max,  # [x_min, x_max, y_min, y_max, z_min, z_max]
                              -np.inf, np.inf,
                              # 考虑原始点云的包围盒的y轴范围作为还原的范围，因为在partition时，没有考虑y轴方向
-                             extend_camera_bbox[2], extend_camera_bbox[3]]
+                             z_min, z_max]
+        
         mask = extract_point_cloud(xyz, point_select_bbox)
         xyz_list.append(xyz[mask])
         features_dc_list.append(features_dc[mask])
@@ -126,6 +142,21 @@ def seamless_merge(model_path, partition_point_cloud_dir):
         opacities_list.append(opacities[mask])
         scales_list.append(scales[mask])
         rots_list.append(rots[mask])
+        
+        fig, ax = plt.subplots()
+        x_pos = xyz[mask][:, 0]
+        z_pos = xyz[mask][:, 2]
+        ax.scatter(x_pos, z_pos, c='k', s=1)
+        
+        rect = patches.Rectangle((x_min, z_min), x_max-x_min, z_max-z_min, linewidth=1, edgecolor='blue', facecolor='none')
+        ax.add_patch(rect)
+        ax.title.set_text('Plot of 2D Points')
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Z-axis')
+        fig.tight_layout()
+        fig.savefig(os.path.join(partition_point_cloud_dir, f'{partition.partition_id}_pcd.png'), dpi=200)
+        plt.close(fig)
+        print('point_cloud_path:', point_cloud_path)
 
     points = np.concatenate(xyz_list, axis=0)
     features_dc_list = np.concatenate(features_dc_list, axis=0)
@@ -142,9 +173,18 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     scales_list = scales_list[mask]
     rots_list = rots_list[mask]
 
-    save_ply(save_merge_dir, points, features_dc_list, features_extra_list, opacities_list, scales_list, rots_list)
+    global_model = GaussianModel(3)
+    global_params = {'xyz': torch.from_numpy(points).float().cuda(),
+                     'rotation': torch.from_numpy(rots_list).float().cuda(),
+                     'scaling': torch.from_numpy(scales_list).float().cuda(),
+                     'opacity': torch.from_numpy(opacities_list).float().cuda(),
+                     'features_dc': torch.from_numpy(features_dc_list).float().cuda().permute(0, 2, 1),
+                     'features_rest': torch.from_numpy(features_extra_list).float().cuda().permute(0, 2, 1)}
+    
+    global_model.set_params(global_params)
+    global_model.save_ply(save_merge_dir)
 
 
 if __name__ == '__main__':
-    seamless_merge("../../output/train",
-                   "../../output/train/point_cloud/iteration_30000")
+    seamless_merge("output/train",
+                   "output/train/point_cloud/iteration_30000")
