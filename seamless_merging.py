@@ -179,7 +179,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
                      'scaling': torch.from_numpy(scales_list).float().cuda(),
                      'opacity': torch.from_numpy(opacities_list).float().cuda(),
                      'features_dc': torch.from_numpy(features_dc_list).float().cuda().permute(0, 2, 1),
-                     'features_rest': torch.from_numpy(features_extra_list).float().cuda().permute(0, 2, 1),}
+                     'features_rest': torch.from_numpy(features_extra_list).float().cuda().permute(0, 2, 1)}
     
     global_model.set_params(global_params)
     global_model.save_ply(save_merge_dir)
