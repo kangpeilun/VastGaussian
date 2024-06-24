@@ -128,7 +128,9 @@ If you have any experiences and feedback on any code changes, feel free to conta
 6. In the process of implementation, I used a small range of data provided by 3DGS for testing. Larger data can not run on the native computer, and a large range of data requires at least **32G video memory** according to the instructions of the paper.
 7. In the implementation process, some operations in the paper, the author is not very clear about the details, so some implementation is based on my guess and understanding to complete, so my implementation may have some bugs, and some implementation may be a little stupid in the eyes of the expert, if you find problems in the use of the process, please contact me in time, progress together.
 
-## Using
+## For Training and Evaluation
+You can refer to the parameter Settings in the files `train_vast.sh` and `eval_vast.sh`
+
 1. The data format is the same as 3DGS, and the training command is basically the same as 3DGS. I didn't make too many personalized changes, you can refer to the following command (see `arguments/parameters.py` for more parameters):
 if you want to perform manhattan alignment:
 
@@ -149,6 +151,8 @@ python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --plantform clou
 ```
 
 Train without Manhattan alignment:
+
+This may cause an error because the Manhattan alignment is not performed, which may cause an error when the data partition is executed
 ```python
 python train_vast.py -s datasets/xxx --exp_name test
 ```
@@ -157,15 +161,63 @@ python train_vast.py -s datasets/xxx --exp_name test
 I get the preprocessed data from https://vastgaussian.github.io/, and implement Manhattan alignment, you can use my pos and rot params.
 ```python
 # train rubble
-python train_vast.py -s ../datasets/Mill19/rubble --exp_name rubble --manhattan --pos "25.607364654541 0.000000000000 -12.012700080872" --rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" --eval --llffhold 83
+python train_vast.py -s ../datasets/Mill19/rubble \
+--exp_name rubble \
+--manhattan \
+--eval \
+--llffhold 83 \
+--resolution 4 \
+--pos "25.607364654541 0.000000000000 -12.012700080872" \
+--rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" \
+--m_region 3 \
+--n_region 3 \
+--iterations 60_000
 
 # train building
-python train_vast.py -s ../datasets/Mill19/building --exp_name building --manhattan --pos "-62.527942657471 0.000000000000 -15.786898612976" --rot "0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759" --eval --llffhold 83
+python train_vast.py -s ../datasets/Mill19/building \
+--exp_name building \
+--manhattan \
+--eval \
+--llffhold 83 \
+--resolution 4 \
+--pos "-62.527942657471 0.000000000000 -15.786898612976" \
+--rot "0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759" \
+--m_region 3 \
+--n_region 3 \
+--iterations 60_000
+```
+
+### Evaluation Mill-19 and Urbanscene3D
+
+```python
+# train rubble
+python eval_vast.py -s ../datasets/Mill19/rubble \
+--exp_name rubble \
+--manhattan \
+--eval \
+--llffhold 83 \
+--pos "25.607364654541 0.000000000000 -12.012700080872" \
+--rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" \
+--m_region 3 \
+--n_region 3 \
+--load_iteration 60_000
+
+# train building
+python eval_vast.py -s ../datasets/Mill19/building \
+--exp_name building \
+--manhattan \
+--eval \
+--llffhold 83 \
+--pos "-62.527942657471 0.000000000000 -15.786898612976" \
+--rot "0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759" \
+--m_region 3 \
+--n_region 3 \
+--load_iteration 60_000
 ```
 
 ## Additional Parameter
 
-I added new parameters in `arguments/parameters.py`
+I added new parameters in `arguments/__init__.py`
 <details>
 <summary><span style="font-weight: bold;">New Parameters for train_vast.py</span></summary>
 
