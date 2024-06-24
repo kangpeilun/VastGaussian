@@ -1,5 +1,5 @@
 # train building
-#python seamless_merging.py -s ../datasets/Mill19/building \
+#python eval_vast.py -s ../datasets/Mill19/building \
 #--exp_name building \
 #--manhattan \
 #--eval \
@@ -12,7 +12,7 @@
 
 
 # train rubble
-python seamless_merging.py -s ../datasets/Mill19/rubble \
+python eval_vast.py -s ../datasets/Mill19/rubble \
 --exp_name rubble \
 --manhattan \
 --eval \
@@ -24,7 +24,7 @@ python seamless_merging.py -s ../datasets/Mill19/rubble \
 --load_iteration 60_000
 
 # train train
-#python seamless_merging.py -s ../datasets/tandt/train \
+#python eval_vast.py -s ../datasets/tandt/train \
 #--exp_name train \
 #--manhattan \
 #--pos "-7.70662571 4.45195873 0.51466437" \
