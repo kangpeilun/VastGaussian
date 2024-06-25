@@ -113,6 +113,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
 
     for partition in partition_scene:
         point_cloud_path = os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_point_cloud.ply")
+        if not os.path.exists(point_cloud_path): continue
         xyz, features_dc, features_extra, opacities, scales, rots = load_ply(point_cloud_path)
         ori_camera_bbox = partition.ori_camera_bbox
         extend_camera_bbox = partition.extend_camera_bbox  # 原始相机包围盒
@@ -137,7 +138,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
         z_min = -np.inf if flag[2] else z_min
 
         print('region:', point_cloud_path)
-        print('x_min:{}, x_max:{}, z_min:{}, z_max:{}\n'.format(x_min, x_max, z_min, z_max))
+        print('x_min:{}, x_max:{}, z_min:{}, z_max:{}'.format(x_min, x_max, z_min, z_max))
         
         point_select_bbox = [x_min, x_max,  # [x_min, x_max, y_min, y_max, z_min, z_max]
                              -np.inf, np.inf,
@@ -165,7 +166,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
         fig.tight_layout()
         fig.savefig(os.path.join(partition_point_cloud_dir, f'{partition.partition_id}_pcd.png'), dpi=200)
         plt.close(fig)
-        print('point_cloud_path:', point_cloud_path)
+        print('point_cloud_path:', point_cloud_path, "\n")
 
         storePly(os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_seamless.ply"), xyz[mask], np.zeros_like(xyz[mask]))
 
