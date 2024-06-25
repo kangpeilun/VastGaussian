@@ -9,8 +9,6 @@ If you have any experiences and feedback on any code changes, feel free to conta
 > 
 > WeChat: k374774222
 
-<a style="color: red">*I'm trying to refactor this repository, and the current code looks a bit messy and disorganized*</a>
-
 ## ToDo List
 - [x] ~~Refactor repository <a style="color: red">Important !</a>~~
 
@@ -33,6 +31,8 @@ If you have any experiences and feedback on any code changes, feel free to conta
 - [x] ~~For non-standard scenes by manual Manhattan alignment~~
 
 - [x] ~~Parallel training of $m\times n$ regions on $n$ GPUs is implemented after dividing the point cloud~~ Thanks [livion](https://github.com/Livioni) a lot.
+
+- [ ] Refine Data Partition
 
 - [ ] Refine Seamless Merging
 
