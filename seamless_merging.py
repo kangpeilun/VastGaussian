@@ -126,10 +126,10 @@ def seamless_merge(model_path, partition_point_cloud_dir):
         z_min = ori_camera_bbox[2]
 
         flag = extend_inf_x_z_bbox(partition.partition_id, m_region, n_region)
-        if partition.partition_id == "1_1":
-            flag = [True, False, True, True]
-        if partition.partition_id == "2_1":
-            flag = [False, True, True, True]
+        # if partition.partition_id == "1_1":
+        #     flag = [True, False, True, True]
+        # if partition.partition_id == "2_1":
+        #     flag = [False, True, True, True]
 
         x_max = np.inf if flag[1] else x_max
         x_min = -np.inf if flag[0] else x_min
@@ -137,7 +137,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
         z_min = -np.inf if flag[2] else z_min
 
         print('region:', point_cloud_path)
-        print('x_min:{}, x_max:{}, z_min:{}, z_max:{}'.format(x_min, x_max, z_min, z_max))
+        print('x_min:{}, x_max:{}, z_min:{}, z_max:{}\n'.format(x_min, x_max, z_min, z_max))
         
         point_select_bbox = [x_min, x_max,  # [x_min, x_max, y_min, y_max, z_min, z_max]
                              -np.inf, np.inf,
@@ -197,5 +197,5 @@ def seamless_merge(model_path, partition_point_cloud_dir):
 
 
 if __name__ == '__main__':
-    seamless_merge("output/train_2_1",
-                   "output/train_2_1/point_cloud/iteration_60000")
+    seamless_merge("output/train",
+                   "output/train/point_cloud/iteration_60000")
