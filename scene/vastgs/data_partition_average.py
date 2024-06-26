@@ -88,7 +88,6 @@ class ProgressiveDataPartitioning:
                                          facecolor='none')
             rect_ext = patches.Rectangle((ex_x_min, ex_z_min), ex_x_max-ex_x_min, ex_z_max-ex_z_min, linewidth=1, edgecolor='y', facecolor='none')
             self.ax.add_patch(rect_ori)
-            self.ax.text(x=rect_ori.get_x(), y=rect_ori.get_y(), s=f"{partition.partition_id}", color='black', fontsize=12)
             self.ax.add_patch(rect_ext)
         self.fig.savefig(os.path.join(self.model_path, f'regions.png'),dpi=200)
         return
@@ -96,9 +95,8 @@ class ProgressiveDataPartitioning:
     def run_DataPartition(self, train_cameras):
         if not os.path.exists(self.save_partition_data_dir):
             partition_dict = self.Camera_position_based_region_division(train_cameras)
-            partition_dict, refined_ori_bbox = self.refine_ori_bbox(partition_dict)
-            # partition_dict, refined_ori_bbox = self.refine_ori_bbox_average(partition_dict)
-            partition_list = self.Position_based_data_selection(partition_dict, refined_ori_bbox)
+            bbox_with_id = self.refine_ori_bbox(partition_dict)
+            partition_list = self.Position_based_data_selection(partition_dict, bbox_with_id)
             self.draw_partition(partition_list)
             self.partition_scene = self.Visibility_based_camera_selection(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云
             self.save_partition_data()
@@ -123,9 +121,8 @@ class ProgressiveDataPartitioning:
         """
         bbox_with_id = {}
         # 1.获取每个分区的相机边界
-        for partition_idx, cameras in partition_dict.items():
+        for partition_idx, camera_list in partition_dict.items():
             # TODO: 需要修改，origin边界用分区时的边界，不能使用相机的位置作为边界，否则无法做到无缝合并
-            camera_list = cameras["camera_list"]
             min_x, max_x = min(camera.pose[0] for camera in camera_list), max(
                 camera.pose[0] for camera in camera_list)  # min_x, max_x表示相机围成的区域的x轴方向的长度
             min_z, max_z = min(camera.pose[2] for camera in camera_list), max(camera.pose[2] for camera in camera_list)
@@ -177,50 +174,8 @@ class ProgressiveDataPartitioning:
                 mid_x = (max_x_left + min_x_right) / 2
                 bbox_with_id[partition_idx] = [mid_x, max_x, min_z, max_z]
 
-        new_partition_dict = {f"{partition_id}": cameras["camera_list"] for partition_id, cameras in
-                              partition_dict.items()}
-        return new_partition_dict, bbox_with_id
+        return bbox_with_id
 
-    def refine_ori_bbox(self, partition_dict):
-        """将连续的相机坐标作为无缝分块的边界"""
-        bbox_with_id = {}
-        for partition_idx, cameras in partition_dict.items():
-            # TODO: 需要修改，origin边界用分区时的边界，不能使用相机的位置作为边界，否则无法做到无缝合并
-            camera_list = cameras["camera_list"]
-            min_x, max_x = min(camera.pose[0] for camera in camera_list), max(
-                camera.pose[0] for camera in camera_list)  # min_x, max_x表示相机围成的区域的x轴方向的长度
-            min_z, max_z = min(camera.pose[2] for camera in camera_list), max(camera.pose[2] for camera in camera_list)
-            ori_camera_bbox = [min_x, max_x, min_z, max_z]
-            bbox_with_id[partition_idx] = ori_camera_bbox
-
-        # 2.按照z轴对相机的边界进行修正
-        for m in range(1, self.m_region+1):
-            for n in range(1, self.n_region+1):
-                if n+1 == self.n_region+1:
-                    break
-                partition_idx_1 = str(m) + '_' + str(n+1)  # 上边块
-                min_x_1, max_x_1, min_z_1, max_z_1 = bbox_with_id[partition_idx_1]
-                partition_idx_2 = str(m) + '_' + str(n)  # 下边块
-                min_x_2, max_x_2, min_z_2, max_z_2 = bbox_with_id[partition_idx_2]
-                mid_x, mid_y, mid_z = partition_dict[partition_idx_2]["z_mid_camera"].pose
-                bbox_with_id[partition_idx_1] = [min_x_1, max_x_1, mid_z, max_z_1]
-                bbox_with_id[partition_idx_2] = [min_x_2, max_x_2, min_z_2, mid_z]
-
-        # 3.按照x轴对相机的边界进行修正
-        for n in range(1, self.n_region + 1):
-            for m in range(1, self.m_region + 1):
-                if m + 1 == self.m_region + 1:
-                    break
-                partition_idx_1 = str(m) + '_' + str(n)  # 左边块
-                min_x_1, max_x_1, min_z_1, max_z_1 = bbox_with_id[partition_idx_1]
-                partition_idx_2 = str(m+1) + '_' + str(n)  # 右边块
-                min_x_2, max_x_2, min_z_2, max_z_2 = bbox_with_id[partition_idx_2]
-                mid_x, mid_y, mid_z = partition_dict[partition_idx_1]["x_mid_camera"].pose
-                bbox_with_id[partition_idx_1] = [min_x_1, mid_x, min_z_1, max_z_1]
-                bbox_with_id[partition_idx_2] = [mid_x, max_x_2, min_z_2, max_z_2]
-
-        new_partition_dict = {f"{partition_id}": cameras["camera_list"] for partition_id, cameras in partition_dict.items()}
-        return new_partition_dict, bbox_with_id
 
     def Camera_position_based_region_division(self, train_cameras):
         """1.基于相机位置的区域划分
@@ -248,32 +203,22 @@ class ProgressiveDataPartitioning:
         sorted_CameraPose_by_x_list = sorted(CameraPose_list, key=lambda x: x.pose[0])  # 按照x轴坐标排序
         # print(sorted_CameraPose_by_x_list)
         for i in range(m):  # 按照x轴将所有相机分成m部分
-            m_partition_dict[str(i + 1)] = {"camera_list": sorted_CameraPose_by_x_list[
-                                           i * num_of_camera_per_m_partition:(i + 1) * num_of_camera_per_m_partition]}
-            if i != m-1:
-                m_partition_dict[str(i + 1)].update({"x_mid_camera": sorted_CameraPose_by_x_list[(i + 1) * num_of_camera_per_m_partition-1]})  # 将左边块的相机作为无缝衔接的边界
-            else:
-                m_partition_dict[str(i + 1)].update({"x_mid_camera": None})  # 最后一块不需要mid_camera
+            m_partition_dict[str(i + 1)] = sorted_CameraPose_by_x_list[
+                                           i * num_of_camera_per_m_partition:(i + 1) * num_of_camera_per_m_partition]
         if total_camera % m != 0:  # 如果相机数量不是m的整数倍，则将余下的相机直接添加到最后一部分
-            m_partition_dict[str(m)]["camera_list"].extend(sorted_CameraPose_by_x_list[m * num_of_camera_per_m_partition:])
+            m_partition_dict[str(m)].extend(sorted_CameraPose_by_x_list[m * num_of_camera_per_m_partition:])
 
         # 3.沿着z轴将相机分成n部分
         partition_dict = {}  # 保存mxn每个部分的相机数量
-        for partition_idx, cameras in m_partition_dict.items():
-            partition_total_camera = len(cameras["camera_list"])  # m个部分，每部分相机数量
+        for partition_idx, camera_list in m_partition_dict.items():
+            partition_total_camera = len(camera_list)  # m个部分，每部分相机数量
             num_of_camera_per_n_partition = partition_total_camera // n  # n个部分，每部分相机数量
-            sorted_CameraPose_by_z_list = sorted(cameras["camera_list"], key=lambda x: x.pose[2])  # 按照z轴坐标排序
+            sorted_CameraPose_by_z_list = sorted(camera_list, key=lambda x: x.pose[2])  # 按照z轴坐标排序
             for i in range(n):  # 按照z轴将所有相机分成n部分
-                partition_dict[f"{partition_idx}_{i + 1}"] = {"camera_list": sorted_CameraPose_by_z_list[
-                                                             i * num_of_camera_per_n_partition:(i + 1) * num_of_camera_per_n_partition]}
-                if i != n-1:
-                    partition_dict[f"{partition_idx}_{i + 1}"].update({"x_mid_camera": cameras["x_mid_camera"]})
-                    partition_dict[f"{partition_idx}_{i + 1}"].update({"z_mid_camera": sorted_CameraPose_by_z_list[(i + 1) * num_of_camera_per_n_partition - 1]})
-                else:
-                    partition_dict[f"{partition_idx}_{i + 1}"].update({"x_mid_camera": cameras["x_mid_camera"]})
-                    partition_dict[f"{partition_idx}_{i + 1}"].update({"z_mid_camera": None})  # 最后一块不需要mid_camera
+                partition_dict[f"{partition_idx}_{i + 1}"] = sorted_CameraPose_by_z_list[
+                                                             i * num_of_camera_per_n_partition:(i + 1) * num_of_camera_per_n_partition]
             if partition_total_camera % n != 0:  # 如果相机数量不是n的整数倍，则将余下的相机直接添加到最后一部分
-                partition_dict[f"{partition_idx}_{n}"]["camera_list"].extend(
+                partition_dict[f"{partition_idx}_{n}"].extend(
                     sorted_CameraPose_by_z_list[n * num_of_camera_per_n_partition:])
 
         return partition_dict
@@ -312,6 +257,10 @@ class ProgressiveDataPartitioning:
         point_num = 0
         point_extend_num = 0
         for partition_idx, camera_list in partition_dict.items():
+            # TODO: 需要修改，origin边界用分区时的边界，不能使用相机的位置作为边界，否则无法做到无缝合并
+            # min_x, max_x = min(camera.pose[0] for camera in camera_list), max(
+            #     camera.pose[0] for camera in camera_list)  # min_x, max_x表示相机围成的区域的x轴方向的长度
+            # min_z, max_z = min(camera.pose[2] for camera in camera_list), max(camera.pose[2] for camera in camera_list)
             min_x, max_x, min_z, max_z = refined_ori_bbox[partition_idx]
             ori_camera_bbox = [min_x, max_x, min_z, max_z]
             extend_camera_bbox = [min_x - self.extend_rate * (max_x - min_x),
@@ -319,35 +268,12 @@ class ProgressiveDataPartitioning:
                                   min_z - self.extend_rate * (max_z - min_z),
                                   max_z + self.extend_rate * (max_z - min_z)]
             print("Partition", partition_idx, "ori_camera_bbox", ori_camera_bbox, "\textend_camera_bbox", extend_camera_bbox)
-            ori_camera_centers = []
-            for camera_pose in camera_list:
-                ori_camera_centers.append(camera_pose.pose)
-
-            # 保存ori相机位置
-            storePly(os.path.join(self.partition_ori_dir, f'{partition_idx}_camera_centers.ply'),
-                     np.array(ori_camera_centers),
-                     np.zeros_like(np.array(ori_camera_centers)))
-
-            # TODO: 需要根据拓展后的边界重新添加相机
-            new_camera_list = []
-            extend_camera_centers = []
-            for id, camera_list in partition_dict.items():
-                for camera_pose in camera_list:
-                    if extend_camera_bbox[0] <= camera_pose.pose[0] <= extend_camera_bbox[1] and extend_camera_bbox[2] <= camera_pose.pose[2] <= extend_camera_bbox[3]:
-                        extend_camera_centers.append(camera_pose.pose)
-                        new_camera_list.append(camera_pose)
-
-            # 保存extend后新添加的相机位置
-            storePly(os.path.join(self.partition_extend_dir, f'{partition_idx}_camera_centers.ply'),
-                     np.array(extend_camera_centers),
-                     np.zeros_like(np.array(extend_camera_centers)))
-
             # 获取该部分对应的点云
             points, colors, normals = self.extract_point_cloud(pcd, ori_camera_bbox)  # 分别提取原始边界内的点云，和拓展边界后的点云
             points_extend, colors_extend, normals_extend = self.extract_point_cloud(pcd, extend_camera_bbox)
             # 论文中说点云围成的边界框的高度选取为最高点到地平面的距离，但在本实现中，因为不确定地平面位置，(可视化中第平面不用坐标轴xz重合)
             # 因此使用整个点云围成的框作为空域感知的边界框
-            partition_list.append(CameraPartition(partition_id=partition_idx, cameras=new_camera_list,
+            partition_list.append(CameraPartition(partition_id=partition_idx, cameras=camera_list,
                                                   point_cloud=BasicPointCloud(points_extend, colors_extend, normals_extend),
                                                   ori_camera_bbox=ori_camera_bbox,
                                                   extend_camera_bbox=extend_camera_bbox,
