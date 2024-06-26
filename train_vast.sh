@@ -13,19 +13,34 @@
 #> log-6.23 2>&1 & echo $! > run.pid
 
 
-# train rubble
+# train rubble cc
+#nohup python train_vast.py -s ../datasets/Mill19/rubble \
+#--exp_name rubble \
+#--manhattan \
+#--eval \
+#--llffhold 83 \
+#--resolution 4 \
+#--pos "25.607364654541 0.000000000000 -12.012700080872" \
+#--rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" \
+#--m_region 3 \
+#--n_region 3 \
+#--iterations 60_000 \
+#> log-6.25 2>&1 & echo $! > run.pid
+
+# train rubble tj
 nohup python train_vast.py -s ../datasets/Mill19/rubble \
---exp_name rubble \
+--exp_name rubble_tj \
 --manhattan \
+--plantform "tj" \
 --eval \
 --llffhold 83 \
 --resolution 4 \
---pos "25.607364654541 0.000000000000 -12.012700080872" \
---rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" \
+--pos "0.0 0.0 0.0" \
+--rot "0.0 21 0.0" \
 --m_region 3 \
---n_region 3 \
+--n_region 4 \
 --iterations 60_000 \
-> log-6.23 2>&1 & echo $! > run.pid
+> log-6.26 2>&1 & echo $! > run.pid
 
 # train train
 #nohup python train_vast.py -s ../datasets/tandt/train \
