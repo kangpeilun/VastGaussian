@@ -94,17 +94,13 @@ def loadCamEval(args, id, cam_info, resolution_scale):
         loaded_mask = resized_image_rgb[3:4, ...]
     # if data is in a validation set, mask right-side pixels, as in Mega-NeRF
     # See https://github.com/cmusatyalab/mega-nerf/issues/18 for more details
-    # TODO: 需要修改val的加载方式
-    if os.path.exists(cam_info.image_path.replace('train/rgbs', 'val/rgbs')):
-        is_val = True
-    else:
-        is_val = False
+
 
     return Camera(colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T,
                   FoVx=cam_info.FovX, FoVy=cam_info.FovY,
                   image=gt_image, gt_alpha_mask=loaded_mask,
                   image_name=cam_info.image_name, uid=id,
-                  data_device=args.data_device, is_val=is_val)
+                  data_device=args.data_device)
 
 
 def camera_to_JSON(id, camera: Camera):
@@ -133,6 +129,31 @@ def camera_to_JSON(id, camera: Camera):
 def loadCamPartition(args, id, cam_info, image_width, image_height):
     # image_width //= args.resolution
     # image_height //= args.resolution
+    # orig_w = image_width
+    # orig_h = image_height
+    # resolution_scale = 1.0
+    #
+    # if args.resolution in [1, 2, 4, 8]:
+    #     resolution = round(orig_w/(resolution_scale * args.resolution)), round(orig_h/(resolution_scale * args.resolution))
+    # else:  # should be a type that converts to float
+    #     if args.resolution == -1:
+    #         if orig_w > 1600:
+    #             global WARNED
+    #             if not WARNED:
+    #                 print("[ INFO ] Encountered quite large input images (>1.6K pixels width), rescaling to 1.6K.\n "
+    #                     "If this is not desired, please explicitly specify '--resolution/-r' as 1")
+    #                 WARNED = True
+    #             global_down = orig_w / 1600
+    #         else:
+    #             global_down = 1
+    #     else:
+    #         global_down = orig_w / args.resolution
+    #
+    #     scale = float(global_down) * float(resolution_scale)
+    #     resolution = (int(orig_w / scale), int(orig_h / scale))
+    #
+    # image_width = resolution[0]
+    # image_height = resolution[1]
 
     return SimpleCamera(
         colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T,

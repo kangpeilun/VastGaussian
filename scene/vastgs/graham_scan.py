@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from shapely.geometry import Polygon, box
+from scipy.spatial import ConvexHull
 
 
 class Point:
@@ -50,7 +51,7 @@ def graham_scan(points):
     return stack
 
 
-def plot_convex_hull(points, convex_hull):
+def plot_convex_hull(points, convex_hull, x, y):
     plt.figure()
     plt.scatter([p.x for p in points], [p.y for p in points], color='b', label="所有点")
 
@@ -62,6 +63,8 @@ def plot_convex_hull(points, convex_hull):
         plt.plot([convex_hull[i].x, convex_hull[(i + 1) % len(convex_hull)].x],
                  [convex_hull[i].y, convex_hull[(i + 1) % len(convex_hull)].y], linestyle='-', color='g')
 
+    plt.plot(x, y)
+
     plt.show()
 
 
@@ -72,13 +75,27 @@ def run_graham_scan(points, W, H):
     :param H 图像高度
     :return 凸包的点集 [x, y]
     """
-    points = [Point(point[0], point[1]) for point in points]
-    convex_hull = graham_scan(points)
-    # plot_convex_hull(points, convex_hull)
-    convex_hull = Polygon([(point.x, point.y) for point in convex_hull])
+    # points = [Point(point[0], point[1]) for point in points]
+    # convex_hull = graham_scan(points)
+    points = np.array(points)
+    convex_hull = ConvexHull(np.array(points))
+    # convex_hull_polygon = Polygon([(point[0], point[1]) for point in convex_hull])
+
+    convex_hull_list = []
+    plt.plot(points[:, 0], points[:, 1], 'o')
+    for i, j in zip(convex_hull.simplices, convex_hull.vertices):
+        plt.plot(points[i, 0], points[i, 1], 'k-')
+        convex_hull_list.append(points[j])
+
+    convex_hull_polygon = Polygon(convex_hull_list)
     image_bounds = box(0, 0, W, H)
+    x = [0, W, W, 0, 0]
+    y = [0, 0, H, H, 0]
+    plt.plot(x, y)
+    plt.show()
+    # plot_convex_hull(points, convex_hull, x, y)
     # 计算凸包与图像边界的交集
-    intersection = convex_hull.intersection(image_bounds)
+    intersection = convex_hull_polygon.intersection(image_bounds)
     image_area = W * H  # 图像面积
     # 计算交集面积占图像面积的比例
     intersection_rate = intersection.area / image_area

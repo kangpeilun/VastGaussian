@@ -13,6 +13,7 @@ import os
 import numpy as np
 from typing import NamedTuple
 import pickle
+import math
 
 from scene.dataset_readers import CameraInfo, storePly
 from utils.graphics_utils import BasicPointCloud
@@ -386,52 +387,40 @@ class ProgressiveDataPartitioning:
             "maxx_maxy_maxz": [x_max, y_max, z_max]   # 8
         }
 
-    def transformPoint4x4(self, p, matrix):
-        """将世界坐标转为NDC空间坐标"""
-        if type(p) == list:
-            transformed = [
-                matrix[0] * p[0] + matrix[4] * p[1] + matrix[8] * p[2] + matrix[12],
-                matrix[1] * p[0] + matrix[5] * p[1] + matrix[9] * p[2] + matrix[13],
-                matrix[2] * p[0] + matrix[6] * p[1] + matrix[10] * p[2] + matrix[14],
-                matrix[3] * p[0] + matrix[7] * p[1] + matrix[11] * p[2] + matrix[15]
-            ]
-        elif type(p) == np.ndarray:
-            transformed = np.array([
-                matrix[0] * p[:, 0] + matrix[4] * p[:, 1] + matrix[8] * p[:, 2] + matrix[12],
-                matrix[1] * p[:, 0] + matrix[5] * p[:, 1] + matrix[9] * p[:, 2] + matrix[13],
-                matrix[2] * p[:, 0] + matrix[6] * p[:, 1] + matrix[10] * p[:, 2] + matrix[14],
-                matrix[3] * p[:, 0] + matrix[7] * p[:, 1] + matrix[11] * p[:, 2] + matrix[15]
-            ])
-        return transformed
 
-    def ndc2Pix(self, v, S):
-        return ((v + 1.0) * S - 1.0) * 0.5;
+    def point_in_image(self, camera, points):
+        """使用投影矩阵将角点投影到二维平面"""
+        # 获取点在图像平面的坐标
+        R = camera.R
+        T = camera.T
+        w2c = np.eye(4)
+        w2c[:3, :3] = np.transpose(R)
+        w2c[:3, 3] = T
+        fx = camera.image_width / (2 * math.tan(camera.FoVx / 2))
+        fy = camera.image_height / (2 * math.tan(camera.FoVy / 2))
 
-    def point_in_image(self, pcd, W, H, matrix):
-        """判断当前点云中，哪些点在图像内"""
-        points = pcd.points
-        colors = pcd.colors
-        normals = pcd.normals
+        intrinsic_matrix = np.array([
+            [fx, 0, camera.image_height // 2],
+            [0, fy, camera.image_width // 2],
+            [0, 0, 1]
+        ])
 
-        p_hom = self.transformPoint4x4(points, matrix)
-        p_w = 1.0 / (p_hom[3, :] + 0.0000001)
-        p_proj = p_hom[:3, :] * p_w[np.newaxis, :]
-        point_image_x = self.ndc2Pix(p_proj[0, :], W)
-        mask_x = (point_image_x >= 0) & (point_image_x <= W)
+        points_camera = np.dot(w2c[:3, :3], points.T) + w2c[:3, 3:].reshape(3, 1)  # [3, n]
+        points_camera = points_camera.T  # [n, 3]  [1, 3]
+        points_camera = points_camera[np.where(points_camera[:, 2] > 0)]  # [n, 3]  这里需要根据z轴过滤一下点
+        points_image = np.dot(intrinsic_matrix, points_camera.T)  # [3, n]
+        points_image = points_image[:2, :] / points_image[2, :]  # [2, n]
+        points_image = points_image.T  # [n, 2]
 
-        point_image_y = self.ndc2Pix(p_proj[2, :], H)  # fix xy to xz
-        mask_y = (point_image_y >= 0) & (point_image_y <= H)
-        mask = mask_x & mask_y
+        mask = np.where(np.logical_and.reduce((
+            points_image[:, 0] >= 0,
+            points_image[:, 0] < camera.image_height,
+            points_image[:, 1] >= 0,
+            points_image[:, 1] < camera.image_width
+        )))[0]
 
-        # for idx, point in enumerate(points):
-        #     p_hom = self.transformPoint4x4(point, matrix)
-        #     p_w = 1.0 / (p_hom[3] + 0.0000001)
-        #     p_proj = [p_hom[0]*p_w, p_hom[1]*p_w, p_hom[2]*p_w]
-        #     point_image = [self.ndc2Pix(p_proj[0], W), self.ndc2Pix(p_proj[1], H)]
-        #     if point_image[0] >= 0 and point_image[0] <= W and point_image[1] >= 0 and point_image[1] <= H:
-        #         # 将能够投影到图片区域的点给筛选出来
-        #         mask[idx] = True
-        return points[mask], colors[mask], normals[mask]
+        return points_image, points_image[mask], mask
+
 
     def Visibility_based_camera_selection(self, partition_list):
         """3.基于可见性的相机选择 和 基于覆盖率的点选择
@@ -452,12 +441,22 @@ class ProgressiveDataPartitioning:
             new_colors = []
             new_normals = []
 
+            pcd_i = partition_i.point_cloud
             partition_id_i = partition_i.partition_id  # 获取当前partition的编号
             # 获取当前partition中点云围成的边界框的8角坐标
-            partition_point_bbox = partition_i.ori_point_bbox
+            partition_ori_point_bbox = partition_i.ori_point_bbox
             partition_extend_point_bbox = partition_i.extend_point_bbox
-            ori_8_corner_points = self.get_8_corner_points(partition_point_bbox)  # 获取点云围成的边界的8个角点的坐标
+            ori_8_corner_points = self.get_8_corner_points(partition_ori_point_bbox)  # 获取点云围成的边界的8个角点的坐标
             extent_8_corner_points = self.get_8_corner_points(partition_extend_point_bbox)
+
+            corner_points = []
+            for point in extent_8_corner_points.values():
+                corner_points.append(point)
+            storePly(os.path.join(self.partition_extend_dir, f'{partition_id_i}_corner_points.ply'),
+                     np.array(corner_points),
+                     np.zeros_like(np.array(corner_points)))
+
+            total_partition_camera_count = 0  # 当前partition中的相机数量
             for partition_j in partition_list:  # 第j个partiiton
                 partition_id_j = partition_j.partition_id  # 获取当前partition的编号
                 if partition_id_i == partition_id_j: continue  # 如果当前partition与之前相同，则跳过
@@ -465,42 +464,62 @@ class ProgressiveDataPartitioning:
                 # 获取当前partition中的点云
                 pcd_j = partition_j.point_cloud
 
-                # 依次获取当前partition中每个相机的投影矩阵
+                append_camera_count = 0  # 用于记录第j个parition被添加了个新相机
+                # 依次获取第j个partition中每个相机的投影矩阵
+                # Visibility_based_camera_selection
                 for cameras_pose in partition_j.cameras:
                     camera = cameras_pose.camera  # 获取当前相机
-                    full_proj_transform = np.array(camera.full_proj_transform.cpu()).flatten()  # 当前相机 世界->相机->裁减->NDC空间 的投影矩阵
-                    # 将i部分的边界框投影到j的当前相机中
+                    # 将i区域的点云投影到相机平面
+                    # 3D points distributed on the object surface
+                    # _, points_in_image, _ = self.point_in_image(camera, pcd_i.points)
+                    # if not len(points_in_image) > 3: continue
+
+                    # 将i部分的point_cloud边界框投影到j的当前相机中
+                    # Visibility_based_camera_selection
+                    # airspace-aware visibility
                     proj_8_corner_points = {}
                     for key, point in extent_8_corner_points.items():
-                        p_hom = self.transformPoint4x4(point, full_proj_transform)  # 模仿diff-gaussian-rasterization中 forward.cu中的写法
-                        p_w = 1.0 / (p_hom[3] + 0.0000001)
-                        p_proj = [p_hom[0] * p_w, p_hom[1] * p_w, p_hom[2] * p_w]  # 得到NDC空间坐标
-                        point_image = [self.ndc2Pix(p_proj[0], camera.image_width),
-                                       self.ndc2Pix(p_proj[2], camera.image_height)]  # 将8个角点映射到当前相机的图像上 fix xy to xz
-                        proj_8_corner_points[key] = point_image
+                        points_in_image, _, _ = self.point_in_image(camera, np.array([point]))
+                        if len(points_in_image) == 0: continue
+                        proj_8_corner_points[key] = points_in_image[0]
 
                     # 基于覆盖率的点选择
                     # i部分中点云边界框投影在j部分当前图像中的面积与当前图像面积的比值
+                    if not len(list(proj_8_corner_points.values())) > 3: continue
                     pkg = run_graham_scan(list(proj_8_corner_points.values()), camera.image_width, camera.image_height)
+                    # pkg = run_graham_scan(points_in_image, camera.image_width, camera.image_height)
                     if pkg["intersection_rate"] >= self.visible_rate:
-                        print(f"Partition {idx} Append Camera {camera.image_name}")
+                        collect_names = [camera_pose.camera.image_name for camera_pose in add_visible_camera_partition_list[idx].cameras]
+                        if cameras_pose.camera.image_name in collect_names:
+                            # print("skip")
+                            continue  # 如果相机已经存在，则不需要再重复添加
+                        append_camera_count += 1
+                        # print(f"Partition {idx} Append Camera {camera.image_name}")
                         # 如果空域感知比率大于阈值，则将j中的当前相机添加到i部分中
                         add_visible_camera_partition_list[idx].cameras.append(cameras_pose)
                         # 筛选在j部分中的所有点中哪些可以投影在当前图像中
-                        updated_points, updated_colors, updated_normals = self.point_in_image(pcd_j, camera.image_width,
-                                                                                              camera.image_height,
-                                                                                              full_proj_transform)  # 在原始点云上需要新增的点
-
+                        _, _, mask = self.point_in_image(camera, pcd_j.points)  # 在原始点云上需要新增的点
+                        updated_points, updated_colors, updated_normals = pcd_j.points[mask], pcd_j.colors[mask], pcd_j.normals[mask]
                         # 更新i部分的需要新增的点云，因为有许多相机可能会观察到相同的点云，因此需要对点云进行去重
                         new_points.append(updated_points)
                         new_colors.append(updated_colors)
                         new_normals.append(updated_normals)
 
-                    with open(os.path.join(self.model_path, "graham_scan"), 'a') as f:
-                        f.write(f"intersection_area:{pkg['intersection_area']} "
-                                    f"image_area:{pkg['image_area']} "
-                                    f"intersection_rate:{pkg['intersection_rate']}\n")
-                        
+                        with open(os.path.join(self.model_path, "graham_scan"), 'a') as f:
+                            f.write(f"intersection_area:{pkg['intersection_area']}\t"
+                                    f"image_area:{pkg['image_area']}\t"
+                                    f"intersection_rate:{pkg['intersection_rate']}\t"
+                                    f"partition_i:{partition_id_i}\t"
+                                    f"partition_j:{partition_id_j}\t"
+                                    f"append_camera_id:{camera.image_name}\t"
+                                    f"append_camera_count:{append_camera_count}\n")
+                total_partition_camera_count += append_camera_count
+
+            with open(os.path.join(self.model_path, "partition_cameras"), 'a') as f:
+                f.write(f"partition_id:{partition_id_i}\t"
+                        f"total_append_camera_count:{total_partition_camera_count}\t"
+                        f"total_camera:{len(add_visible_camera_partition_list[idx].cameras)}\n")
+
             camera_centers = []
             for camera_pose in add_visible_camera_partition_list[idx].cameras:
                 camera_centers.append(camera_pose.pose)

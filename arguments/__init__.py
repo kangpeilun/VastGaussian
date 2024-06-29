@@ -66,7 +66,7 @@ class ModelParams(ParamGroup):
         self.rot = ""  # 点云平移，如果处理平台为cloudcompare，则rot为旋转矩阵，否则用threejs处理rot就为三个旋转向量
         self.man_trans = None  # 指定经过曼哈顿对齐后的点云坐标相对于初始点云坐标的变换矩阵
         # Data Partition
-        self.m_region = 3  # 划分区域的数量，论文作者提醒虽然论文里写的是8块，但实操时用的是9块
+        self.m_region = 3
         self.n_region = 3
         self.extend_rate = 0.2
         self.visible_rate = 0.25

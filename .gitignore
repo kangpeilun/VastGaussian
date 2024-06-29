@@ -2,6 +2,7 @@
 .vscode
 output
 datasets
+exp_log
 build
 SIBR_viewers
 diff_rasterization/diff_rast.egg-info
