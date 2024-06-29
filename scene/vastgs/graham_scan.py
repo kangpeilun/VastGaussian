@@ -82,17 +82,17 @@ def run_graham_scan(points, W, H):
     # convex_hull_polygon = Polygon([(point[0], point[1]) for point in convex_hull])
 
     convex_hull_list = []
-    plt.plot(points[:, 0], points[:, 1], 'o')
+    # plt.plot(points[:, 0], points[:, 1], 'o')
     for i, j in zip(convex_hull.simplices, convex_hull.vertices):
-        plt.plot(points[i, 0], points[i, 1], 'k-')
+        # plt.plot(points[i, 0], points[i, 1], 'k-')
         convex_hull_list.append(points[j])
 
     convex_hull_polygon = Polygon(convex_hull_list)
     image_bounds = box(0, 0, W, H)
-    x = [0, W, W, 0, 0]
-    y = [0, 0, H, H, 0]
-    plt.plot(x, y)
-    plt.show()
+    # x = [0, W, W, 0, 0]
+    # y = [0, 0, H, H, 0]
+    # plt.plot(x, y)
+    # plt.show()
     # plot_convex_hull(points, convex_hull, x, y)
     # 计算凸包与图像边界的交集
     intersection = convex_hull_polygon.intersection(image_bounds)
