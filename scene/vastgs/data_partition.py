@@ -498,6 +498,7 @@ class ProgressiveDataPartitioning:
                         # 如果空域感知比率大于阈值，则将j中的当前相机添加到i部分中
                         add_visible_camera_partition_list[idx].cameras.append(cameras_pose)
                         # 筛选在j部分中的所有点中哪些可以投影在当前图像中
+                        # Coverage-based point selection
                         _, _, mask = self.point_in_image(camera, pcd_j.points)  # 在原始点云上需要新增的点
                         updated_points, updated_colors, updated_normals = pcd_j.points[mask], pcd_j.colors[mask], pcd_j.normals[mask]
                         # 更新i部分的需要新增的点云，因为有许多相机可能会观察到相同的点云，因此需要对点云进行去重
@@ -545,27 +546,7 @@ class ProgressiveDataPartitioning:
             add_visible_camera_partition_list[idx] = add_visible_camera_partition_list[idx]._replace(
                 point_cloud=BasicPointCloud(points=new_points, colors=new_colors,
                                             normals=new_normals))  # 更新点云，新增的点云有许多重复的点，需要在后面剔除掉
-            # store_path = os.path.join(self.partition_visible_dir, str(client))
-            # if not os.path.exists(store_path): os.makedirs(store_path)
-            # storePly(os.path.join(self.partition_visible_dir, str(client), f"visible.ply"), new_points, new_colors)  # 保存可见性选择后每个partition的点云
-            # client += 1
             storePly(os.path.join(self.partition_visible_dir, f"{partition_id_i}_visible.ply"), new_points,
                      new_colors)  # 保存可见性选择后每个partition的点云
 
         return add_visible_camera_partition_list
-
-    # def format_data(self):
-    #     """对经过数据分区后的数据的格式进行规范，使得和一开始的3DGS的数据格式一致
-    #     思路：1.输出每个partition的cameras
-    #          2.输出每个partition的点云
-    #          3.计算每个partition中相机的尺寸, 目前先使用通过整个场景计算出来的尺寸
-    #     """
-    #     format_data = []
-    #     for partition in self.partition_scene:
-    #         partition_id = partition.partition_id
-    #         point_cloud = partition.point_cloud
-    #         cameras = [CameraPose.camera for CameraPose in partition.cameras]
-    #         cameras_extent = getNerfppNorm_partition(cameras)["radius"]  # 对每个分块后的区域都分别计算一次cameras_extent
-    #         format_data.append([cameras, point_cloud, cameras_extent])
-    #
-    #     return format_data
