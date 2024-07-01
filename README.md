@@ -220,18 +220,29 @@ Airspace-aware visibility rate
 
 ### Render and Evaluate Mill-19 and Urbanscene3D
 *Evaluation method*: During training, every 83 images were used as a test image (`llffhold=83`). For rubble, 21 images were selected and added to the test set. 
-Only the left half of these 21 images were used for training during training, and the remaining right half was used for evaluation during evaluation
-```python
-# training
-if viewpoint_cam.image_name in test_camList:
-    gt_image = gt_image[..., :gt_image.shape[-1] // 2]
-    image = image[..., :image.shape[-1] // 2]
-    decouple_image = decouple_image[..., :decouple_image.shape[-1] // 2]
 
-# Evaluation
-renders = [image[..., image.shape[-1]//2:] for image in renders]
-gts = [image[..., image.shape[-1]//2:] for image in gts]
-```
+[//]: # (Only the left half of these 21 images were used for training during training, and the remaining right half was used for evaluation during evaluation)
+
+[//]: # (```python)
+
+[//]: # (# training)
+
+[//]: # (if viewpoint_cam.image_name in test_camList:)
+
+[//]: # (    gt_image = gt_image[..., :gt_image.shape[-1] // 2])
+
+[//]: # (    image = image[..., :image.shape[-1] // 2])
+
+[//]: # (    decouple_image = decouple_image[..., :decouple_image.shape[-1] // 2])
+
+[//]: # ()
+[//]: # (# Evaluation)
+
+[//]: # (renders = [image[..., image.shape[-1]//2:] for image in renders])
+
+[//]: # (gts = [image[..., image.shape[-1]//2:] for image in gts])
+
+[//]: # (```)
 
 
 ```python
@@ -271,61 +282,6 @@ python metrics.py -m output/building
 > https://vastgaussian.github.io/ have uploaded the pre-processed data for `Urbanscene3D` and `Mill-19`
 
 3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
-
-
-[//]: # (## Experiment)
-
-[//]: # (### rubble)
-
-[//]: # (<center class="half" >)
-
-[//]: # (trained rubble)
-
-[//]: # (    <img src="assets/img_22.png">)
-
-[//]: # (checkpoint rubble)
-
-[//]: # (    <img src="assets/img_23.png">)
-
-[//]: # (</center>)
-
-[//]: # (<center class="half">)
-
-[//]: # (<img src="assets/rubble/ours_60000/gt/00000.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders/00000.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders_train/00000.png" width="300">)
-
-[//]: # ()
-[//]: # (<img src="assets/rubble/ours_60000/gt/00001.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders/00001.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders_train/00001.png" width="300">)
-
-[//]: # ()
-[//]: # (<img src="assets/rubble/ours_60000/gt/00002.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders/00002.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders_train/00002.png" width="300">)
-
-[//]: # ()
-[//]: # (<img src="assets/rubble/ours_60000/gt/00003.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders/00003.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders_train/00003.png" width="300">)
-
-[//]: # ()
-[//]: # (<img src="assets/rubble/ours_60000/gt/00004.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders/00004.png" width="300">)
-
-[//]: # (<img src="assets/rubble/ours_60000/renders_train/00004.png" width="300">)
-
-[//]: # (</center>)
 
 
 
