@@ -118,7 +118,6 @@ If you have any experiences and feedback on any code changes, feel free to conta
 >  <img src="assets/img_16.png" width="800">
 >  <img src="assets/img_17.png" width="800">
 >  <img src="assets/img_18.png" width="800">
->  <img src="assets/img_18.png" width="800">
 >  <img src="assets/img_19.png" width="800">
 > </div>
 >
