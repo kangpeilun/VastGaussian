@@ -36,7 +36,10 @@ If you have any experiences and feedback on any code changes, feel free to conta
 
 - [x] ~~Refine Seamless Merging~~
 
+- [x] ~~update color correct and LPIPS (using alex net) while evaluation~~
+
 - [ ] Experiments are carried out on UrbanScene3D and Mill-19 datasets
+
 - [ ] Fix bugs, and bugs, and bugs ...
 
 ## Some notes
