@@ -105,10 +105,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         gt_image = viewpoint_cam.original_image.cuda()
 
         if viewpoint_cam.image_name in test_camList:
-            # 如果该图片在测试集中，移除该图像的右半边用于test，仅使用左半边图像进行train
-            gt_image = gt_image[..., :gt_image.shape[-1] // 2]
-            image = image[..., :image.shape[-1] // 2]
-            decouple_image = decouple_image[..., :decouple_image.shape[-1] // 2]
+            # 作者提醒，测试集不需要进行训练
+            continue
+
+            # # 如果该图片在测试集中，移除该图像的右半边用于test，仅使用左半边图像进行train
+            # gt_image = gt_image[..., :gt_image.shape[-1] // 2]
+            # image = image[..., :image.shape[-1] // 2]
+            # decouple_image = decouple_image[..., :decouple_image.shape[-1] // 2]
 
         # Loss
         # Ll1 = l1_loss(image, gt_image)

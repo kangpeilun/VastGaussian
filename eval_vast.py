@@ -34,8 +34,8 @@ def eval(dataset, pipe, args):
                 for idx, viewpoint in enumerate(config['cameras']):
                     image = torch.clamp(render(viewpoint, scene.gaussians, pipe, background)["render"], 0.0, 1.0)
                     gt_image = torch.clamp(viewpoint.original_image.to("cuda"), 0.0, 1.0)
-                    image = image[..., image.shape[-1] // 2:]
-                    gt_image = gt_image[..., gt_image.shape[-1] // 2:]
+                    # image = image[..., image.shape[-1] // 2:]
+                    # gt_image = gt_image[..., gt_image.shape[-1] // 2:]
                     current_l1 = l1_loss(image, gt_image).mean().double()
                     current_psnr = psnr(image, gt_image).mean().double()
                     l1_test += current_l1

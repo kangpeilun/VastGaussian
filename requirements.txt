@@ -8,5 +8,6 @@ matplotlib
 opencv-python
 colorama
 shapely
+jax
 submodules/diff-gaussian-rasterization
 submodules/simple-knn

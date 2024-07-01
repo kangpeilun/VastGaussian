@@ -186,36 +186,7 @@ python train_vast.py -s ../datasets/Mill19/building \
 --n_region 3 \
 --iterations 60_000
 ```
-
-### Evaluation Mill-19 and Urbanscene3D
-
-```python
-# train rubble
-python eval_vast.py -s ../datasets/Mill19/rubble \
---exp_name rubble \
---manhattan \
---eval \
---llffhold 83 \
---pos "25.607364654541 0.000000000000 -12.012700080872" \
---rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" \
---m_region 3 \
---n_region 3 \
---load_iteration 60_000
-
-# train building
-python eval_vast.py -s ../datasets/Mill19/building \
---exp_name building \
---manhattan \
---eval \
---llffhold 83 \
---pos "-62.527942657471 0.000000000000 -15.786898612976" \
---rot "0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759" \
---m_region 3 \
---n_region 3 \
---load_iteration 60_000
-```
-
-## Additional Parameter
+#### Additional Parameter
 
 I added new parameters in `arguments/__init__.py`
 <details>
@@ -244,6 +215,52 @@ Airspace-aware visibility rate
 </details>
 
 
+### Render and Evaluate Mill-19 and Urbanscene3D
+*Evaluation method*: During training, every 83 images were used as a test image (`llffhold=83`). For rubble, 21 images were selected and added to the test set. 
+Only the left half of these 21 images were used for training during training, and the remaining right half was used for evaluation during evaluation
+```python
+# training
+if viewpoint_cam.image_name in test_camList:
+    gt_image = gt_image[..., :gt_image.shape[-1] // 2]
+    image = image[..., :image.shape[-1] // 2]
+    decouple_image = decouple_image[..., :decouple_image.shape[-1] // 2]
+
+# Evaluation
+renders = [image[..., image.shape[-1]//2:] for image in renders]
+gts = [image[..., image.shape[-1]//2:] for image in gts]
+```
+
+
+```python
+# render rubble
+python render.py -s ../datasets/Mill19/rubble \
+--exp_name rubble \
+--eval \
+--manhattan \
+--resolution 4 \
+--pos "25.607364654541 0.000000000000 -12.012700080872" \
+--rot "0.923032462597 0.000000000000 0.384722054005 0.000000000000 1.000000000000 0.000000000000 -0.384722054005 0.000000000000 0.923032462597" \
+--load_iteration 60_000
+
+# eval rubble
+python metrics.py -m output/rubble
+
+
+# render building
+python render.py -s ../datasets/Mill19/building \
+--exp_name building \
+--manhattan \
+--eval \
+--llffhold 83 \
+--resolution 4 \
+--pos "-62.527942657471 0.000000000000 -15.786898612976" \
+--rot "0.932374119759 0.000000000000 0.361494839191 0.000000000000 1.000000000000 0.000000000000 -0.361494839191 0.000000000000 0.932374119759" \
+--load_iteration 60_000
+
+# eval building
+python metrics.py -m output/building
+```
+
 ## Datasets
 1. `Urbanscene3D`: https://github.com/Linxius/UrbanScene3D
 
@@ -251,6 +268,64 @@ Airspace-aware visibility rate
 > https://vastgaussian.github.io/ have uploaded the pre-processed data for `Urbanscene3D` and `Mill-19`
 
 3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
+
+
+[//]: # (## Experiment)
+
+[//]: # (### rubble)
+
+[//]: # (<center class="half" >)
+
+[//]: # (trained rubble)
+
+[//]: # (    <img src="assets/img_22.png">)
+
+[//]: # (checkpoint rubble)
+
+[//]: # (    <img src="assets/img_23.png">)
+
+[//]: # (</center>)
+
+[//]: # (<center class="half">)
+
+[//]: # (<img src="assets/rubble/ours_60000/gt/00000.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders/00000.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders_train/00000.png" width="300">)
+
+[//]: # ()
+[//]: # (<img src="assets/rubble/ours_60000/gt/00001.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders/00001.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders_train/00001.png" width="300">)
+
+[//]: # ()
+[//]: # (<img src="assets/rubble/ours_60000/gt/00002.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders/00002.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders_train/00002.png" width="300">)
+
+[//]: # ()
+[//]: # (<img src="assets/rubble/ours_60000/gt/00003.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders/00003.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders_train/00003.png" width="300">)
+
+[//]: # ()
+[//]: # (<img src="assets/rubble/ours_60000/gt/00004.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders/00004.png" width="300">)
+
+[//]: # (<img src="assets/rubble/ours_60000/renders_train/00004.png" width="300">)
+
+[//]: # (</center>)
+
+
+
 
 # Contributors
 Happily, we now have several contributors working on the project, and we welcome more contributors to join us to improve the project. Thank you all for your work.
