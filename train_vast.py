@@ -90,6 +90,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
+            new_viewpoint_stack = []
+            for view in viewpoint_stack:  # 训练时剔除测试集图片
+                if view.image_name not in test_camList:
+                    new_viewpoint_stack.append(view)
+            viewpoint_stack = new_viewpoint_stack
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
         # Render
@@ -104,10 +109,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         decouple_image, transformation_map = decouple_appearance(image, gaussians, viewpoint_cam.uid)
         gt_image = viewpoint_cam.original_image.cuda()
 
-        if viewpoint_cam.image_name in test_camList:
-            # 作者提醒，测试集不需要进行训练
-            continue
-
+        # if viewpoint_cam.image_name in test_camList:
             # # 如果该图片在测试集中，移除该图像的右半边用于test，仅使用左半边图像进行train
             # gt_image = gt_image[..., :gt_image.shape[-1] // 2]
             # image = image[..., :image.shape[-1] // 2]
