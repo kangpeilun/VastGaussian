@@ -55,6 +55,7 @@ If you have any experiences and feedback on any code changes, feel free to conta
 > - `data_partition.py` corresponding to the `Progressive Data Partitioning` in the paper.
 >  <div align="center">
 >       <img src=assets/img_3.png width=800>
+>       <img src="assets/regions_rubble.png" width="800">
 >  </div>
 >
 > - `scene/vastgs/appearance_network.py`  corresponding to the `Decoupled Appearance Modeling` in the paper. I refer to the implementation of [gaussian-opacity-fields](https://github.com/autonomousvision/gaussian-opacity-fields)
