@@ -142,14 +142,14 @@ if you want to perform manhattan alignment:
 Using `threejs` for Manhattan alignment
 
 ```python
-python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --plantform threejs --pos "xx xx xx" --rot "xx xx xx"
+python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --plantform tj --pos "xx xx xx" --rot "xx xx xx"
 ```
 
 Using `cloudcompare` for Manhattan alignment
 
 ```python
 # The 9 elements of the rotation matrix should be filled in rot
-python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --plantform cloudcompare --pos "xx xx xx" --rot "xx xx xx xx xx xx xx xx xx"
+python train_vast.py -s datasets/xxx --exp_name xxx --manhattan --plantform cc --pos "xx xx xx" --rot "xx xx xx xx xx xx xx xx xx"
 
 ```
 
@@ -200,7 +200,7 @@ Experiment name
 #### --manhattan
 `store_true`, Whether to perform Manhattan alignment
 #### --plantform
-Platform for Manhattan alignment, choose in "cloudcompare" and "threejs"
+Platform for Manhattan alignment, choose in "cc" and "tj" which means "cloudcompare" and "threejs"
 #### --pos
 Translation vector
 #### --rot
