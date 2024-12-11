@@ -1,3 +1,6 @@
+# Need Some HELP
+> I am planning to spend a year abroad for academic purposes in the upcoming year. Currently, I am in the process of identifying an appropriate laboratory or supervisor, but I am finding it challenging to locate the right connections. My research interests are primarily in the fields of 3D reconstruction and computer vision. I would be immensely grateful if anyone could offer some guidance or suggestions in this regard. Should you be willing to assist, please do not hesitate to reach out to me via my personal email: 374774222@qq.com. Thank you in advance for your consideration.
+
 # VastGaussian
 ![img.png](assets/img_.png)
 
