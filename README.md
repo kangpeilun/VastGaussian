@@ -276,7 +276,7 @@ python metrics.py -m output/building
 2. `Mill-19`: https://opendatalab.com/OpenDataLab/Mill_19/tree/main/raw
 > https://vastgaussian.github.io/ have uploaded the pre-processed data for `Urbanscene3D` and `Mill-19`
 >
-> Since the data provided by vastgaussia.github.io is invalid, I uploaded the data I downloaded to (Baidu web disk)[https://pan.baidu.com/s/1sQZml1XpFGjKlEEsqSpaVw?pwd=5g3h], password `5g3h`
+> Since the data provided by vastgaussia.github.io is invalid, I uploaded the data I downloaded to [Baidu web disk](https://pan.baidu.com/s/1sQZml1XpFGjKlEEsqSpaVw?pwd=5g3h), password `5g3h`
 
 
 3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
