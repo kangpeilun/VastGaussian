@@ -2,7 +2,6 @@
 > I am planning to spend a year abroad for academic purposes in the upcoming year. Currently, I am in the process of identifying an appropriate laboratory or supervisor, but I am finding it challenging to locate the right connections. My research interests are primarily in the fields of 3D reconstruction and computer vision. I would be immensely grateful if anyone could offer some guidance or suggestions in this regard. Should you be willing to assist, please do not hesitate to reach out to me via my personal email: 374774222@qq.com. Thank you in advance for your consideration.
 
 # VastGaussian
-[<img src="https://api.gitsponsors.com/api/badge/img?id=800327971" height="50">](https://api.gitsponsors.com/api/badge/link?p=0uC7/ILazeoYHhjo5AqXokUHcbSZEjVBTcdNOhseAsnWY0hmc/jpkD2/QVbdJ1nUinL+Z1njrEi/AxVcDdh3sfnH26yYeYlZAqVXj3Xl/O2F3vT05R9sTz9DtKLXbius6Kpq0TusUBfhi5QqVtaEIA==)
 
 ![img.png](assets/img_.png)
 
