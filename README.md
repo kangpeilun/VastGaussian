@@ -292,11 +292,10 @@ Happily, we now have several contributors working on the project, and we welcome
   <img src="https://avatars.githubusercontent.com/u/102359772?v=4" height="75" width="75"/>
 </a>
 
+<a href="https://github.com/Livioni">
+  <img src="https://avatars.githubusercontent.com/u/52649461?v=4" height="75" width="75"/>
+</a>
 
 # Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=kangpeilun/VastGaussian&type=date&legend=top-left)](https://www.star-history.com/#kangpeilun/VastGaussian&type=date&legend=top-left)
-
-<a href="https://github.com/Livioni">
-  <img src="https://avatars.githubusercontent.com/u/52649461?v=4" height="75" width="75"/>
-</a>
