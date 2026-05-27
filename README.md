@@ -275,7 +275,8 @@ python metrics.py -m output/building
 > https://vastgaussian.github.io/ have uploaded the pre-processed data for `Urbanscene3D` and `Mill-19`
 >
 > Since the data provided by vastgaussia.github.io is invalid, I uploaded the data I downloaded to [Baidu web disk](https://pan.baidu.com/s/1sQZml1XpFGjKlEEsqSpaVw?pwd=5g3h), password `5g3h`
-
+>
+> I have uploaded the checkpoint and POS files to [Google Drive](https://drive.google.com/drive/folders/1WR1jOWxXqo6EG3z6nMXnZtodxMHIop6Z?usp=sharing)
 
 3. test data for this implementation: https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip
 
