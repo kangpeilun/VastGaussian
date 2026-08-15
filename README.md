@@ -296,4 +296,4 @@ Happily, we now have several contributors working on the project, and we welcome
 
 # Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=kangpeilun/VastGaussian&type=date&legend=top-left)](https://www.star-history.com/#kangpeilun/VastGaussian&type=date&legend=top-left)
+[![Star History Chart](https://star-history.dera.page/svg?repos=kangpeilun/VastGaussian&type=date&legend=top-left)](https://star-history.dera.page/#kangpeilun/VastGaussian&type=date&legend=top-left)
